@@ -1,0 +1,6 @@
+node_modules
+debug
+.env
+*.md
+test-webhook.sh
+.git

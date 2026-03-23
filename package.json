@@ -1,0 +1,21 @@
+{
+  "name": "ivit-webhook",
+  "version": "1.0.0",
+  "description": "iVit webhook scraper — logs into ivit.no and extracts oppdrag data",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "debug": "DEBUG=true node src/index.js",
+    "dry-run": "DRY_RUN=true node src/index.js",
+    "test-webhook": "bash test-webhook.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "puppeteer": "^24.39.1"
+  }
+}
