@@ -17,6 +17,31 @@ function ensureDebugDir() {
 }
 
 /**
+ * Delete debug files older than maxAgeMs (default 24 hours).
+ */
+function cleanupDebugFiles(maxAgeMs = 24 * 60 * 60 * 1000) {
+  try {
+    if (!fs.existsSync(config.debugDir)) return;
+    const now = Date.now();
+    const files = fs.readdirSync(config.debugDir);
+    let deleted = 0;
+    for (const file of files) {
+      const filePath = path.join(config.debugDir, file);
+      const stat = fs.statSync(filePath);
+      if (now - stat.mtimeMs > maxAgeMs) {
+        fs.unlinkSync(filePath);
+        deleted++;
+      }
+    }
+    if (deleted > 0) {
+      console.log(`Cleaned up ${deleted} old debug file(s).`);
+    }
+  } catch (err) {
+    console.error('Debug cleanup error:', err.message);
+  }
+}
+
+/**
  * Save a screenshot for debugging.
  */
 async function saveScreenshot(label = 'error') {
@@ -692,6 +717,7 @@ async function extractOppdragData() {
  * Main scraping function called by the webhook handler.
  */
 async function scrapeOppdrag(address) {
+  cleanupDebugFiles();
   await findOppdrag(address);
   const data = await extractOppdragData();
   return data;
