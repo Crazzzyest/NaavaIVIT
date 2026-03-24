@@ -5,6 +5,17 @@ const { scrapeOppdrag, closeBrowser, saveScreenshot } = require('./scraper');
 const app = express();
 app.use(express.json());
 
+// Global request timeout — 2 minutes max per request
+app.use((req, res, next) => {
+  res.setTimeout(120000, () => {
+    console.error('Request timed out (120s server limit)');
+    if (!res.headersSent) {
+      res.status(504).json({ success: false, error: 'Request timed out (120s)' });
+    }
+  });
+  next();
+});
+
 /**
  * Validate webhook secret if configured.
  */
@@ -60,7 +71,16 @@ app.post('/webhook', validateRequest, async (req, res) => {
     });
   } catch (err) {
     console.error('Scraping error:', err.message);
-    await saveScreenshot('webhook-error');
+
+    // Try to save a screenshot, but don't let it hang the response
+    try {
+      await Promise.race([
+        saveScreenshot('webhook-error'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Screenshot timed out')), 5000)),
+      ]);
+    } catch (screenshotErr) {
+      console.error('Could not save error screenshot:', screenshotErr.message);
+    }
 
     return res.status(500).json({
       success: false,
