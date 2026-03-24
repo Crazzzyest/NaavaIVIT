@@ -695,38 +695,16 @@ async function extractOppdragData() {
     console.log('Befaringer tab not found.');
   }
 
-  // --- Navigate back to Overview to access tilstandsrapport ---
-  console.log('Navigating back to Overview tab...');
-  const oversiktLink = await p.$('a[routerlink="overview"], a[href*="overview"]');
-  if (oversiktLink) {
-    await oversiktLink.click();
-    await new Promise(r => setTimeout(r, 1000));
-    await p.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
-    await waitForSpaReady(p);
-  } else {
-    // Try clicking the Oversikt tab by text
-    await p.evaluate(() => {
-      const links = document.querySelectorAll('a');
-      for (const link of links) {
-        if (link.textContent?.trim() === 'Oversikt') {
-          link.click();
-          return;
-        }
-      }
-    });
-    await new Promise(r => setTimeout(r, 2000));
-    await waitForSpaReady(p);
-  }
-
-  // Tilstandsrapport navigation removed — was causing hangs.
-  // markedsverdi must be set manually in the sheet.
-
-  return {
+  // No need to navigate back — we have all the data we need.
+  const result = {
     befaring_dato: befaringData.befaring_dato,
     befaring_klokkeslett: befaringData.befaring_klokkeslett,
     fakturareferanse: overviewData.fakturareferanse,
     med_markedsverdi: null,
   };
+
+  console.log('Extraction complete:', JSON.stringify(result));
+  return result;
 }
 
 /**
