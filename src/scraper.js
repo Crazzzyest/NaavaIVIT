@@ -718,18 +718,14 @@ async function extractOppdragData() {
     await waitForSpaReady(p);
   }
 
-  // --- Navigate to Tilstandsrapport for markedsverdi ---
-  let reportData = { med_markedsverdi: null };
-  const reportOpened = await navigateToTilstandsrapport(p);
-  if (reportOpened) {
-    reportData = await extractTilstandsrapportData(p);
-  }
+  // Tilstandsrapport navigation removed — was causing hangs.
+  // markedsverdi must be set manually in the sheet.
 
   return {
     befaring_dato: befaringData.befaring_dato,
     befaring_klokkeslett: befaringData.befaring_klokkeslett,
     fakturareferanse: overviewData.fakturareferanse,
-    med_markedsverdi: reportData.med_markedsverdi || 'Nei',
+    med_markedsverdi: null,
   };
 }
 
