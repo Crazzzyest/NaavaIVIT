@@ -533,31 +533,58 @@ async function navigateToTilstandsrapport(p) {
 
 /**
  * Extract data from the tilstandsrapport page.
- * Fields like markedsverdi are found in the report sidebar/sections.
+ * Reads the markedsverdi checkbox (mat-checkbox with aria-checked).
  */
 async function extractTilstandsrapportData(p) {
   console.log('Extracting data from tilstandsrapport...');
 
   const reportData = await p.evaluate(() => {
     const result = {};
-    const bodyTextLower = (document.body.innerText || '').toLowerCase();
 
-    // "Markedsverdi" — look in the sidebar navigation items and page content
-    if (bodyTextLower.includes('med markedsverdi')) {
-      result.med_markedsverdi = 'Med markedsverdi';
-    } else if (bodyTextLower.includes('uten markedsverdi')) {
-      result.med_markedsverdi = 'Uten markedsverdi';
-    } else {
-      // Check if "Markedsverdi" exists as a sidebar section (it's present on the page)
-      const sidebarItems = document.querySelectorAll('a, div, span, li');
-      let hasMarkedsverdiSection = false;
-      for (const el of sidebarItems) {
-        if (el.textContent?.trim() === 'Markedsverdi') {
-          hasMarkedsverdiSection = true;
+    // Look for a mat-checkbox near a "Markedsverdi" label.
+    // The checkbox input has aria-checked="true" or "false".
+    const allLabels = document.querySelectorAll('label, span, div, mat-label');
+    let markedsverdiCheckbox = null;
+
+    for (const el of allLabels) {
+      const text = el.textContent?.trim().toLowerCase() || '';
+      if (text.includes('markedsverdi') && !text.includes('uten') && text.length < 40) {
+        // Look for a mat-checkbox in the same parent or nearby
+        const parent = el.closest('mat-checkbox, .mat-checkbox') || el.parentElement?.closest('mat-checkbox, .mat-checkbox');
+        if (parent) {
+          markedsverdiCheckbox = parent.querySelector('input[type="checkbox"]');
+          break;
+        }
+        // Also check siblings
+        const container = el.parentElement;
+        if (container) {
+          markedsverdiCheckbox = container.querySelector('mat-checkbox input[type="checkbox"], .mat-checkbox input[type="checkbox"]');
+          if (markedsverdiCheckbox) break;
+        }
+      }
+    }
+
+    // Fallback: find any mat-checkbox whose associated label contains "markedsverdi"
+    if (!markedsverdiCheckbox) {
+      const allCheckboxes = document.querySelectorAll('mat-checkbox, .mat-checkbox');
+      for (const cb of allCheckboxes) {
+        const cbText = cb.textContent?.trim().toLowerCase() || '';
+        if (cbText.includes('markedsverdi')) {
+          markedsverdiCheckbox = cb.querySelector('input[type="checkbox"]');
           break;
         }
       }
-      result.med_markedsverdi = hasMarkedsverdiSection ? 'Med markedsverdi' : null;
+    }
+
+    if (markedsverdiCheckbox) {
+      const isChecked = markedsverdiCheckbox.getAttribute('aria-checked') === 'true'
+                     || markedsverdiCheckbox.checked;
+      result.med_markedsverdi = isChecked ? 'Ja' : 'Nei';
+      console.log('Markedsverdi checkbox found, aria-checked=' + markedsverdiCheckbox.getAttribute('aria-checked'));
+    } else {
+      // No checkbox found — default to Nei (not checked)
+      result.med_markedsverdi = 'Nei';
+      console.log('No markedsverdi checkbox found — defaulting to Nei');
     }
 
     return result;
@@ -588,15 +615,8 @@ async function extractOppdragData() {
     const deresRefInput = document.querySelector('input[data-fieldname="Deres ref"]');
     result.fakturareferanse = deresRefInput?.value?.trim() || null;
 
-    // "Med markedsverdi" — check on overview page
-    const allText = document.body.innerText || '';
-    if (allText.toLowerCase().includes('med markedsverdi')) {
-      result.med_markedsverdi = 'Med markedsverdi';
-    } else if (allText.toLowerCase().includes('uten markedsverdi')) {
-      result.med_markedsverdi = 'Uten markedsverdi';
-    } else {
-      result.med_markedsverdi = null;
-    }
+    // Markedsverdi — will be determined from tilstandsrapport checkbox
+    result.med_markedsverdi = null;
 
     return result;
   });
@@ -709,18 +729,41 @@ async function extractOppdragData() {
     befaring_dato: befaringData.befaring_dato,
     befaring_klokkeslett: befaringData.befaring_klokkeslett,
     fakturareferanse: overviewData.fakturareferanse,
-    med_markedsverdi: overviewData.med_markedsverdi || reportData.med_markedsverdi || null,
+    med_markedsverdi: reportData.med_markedsverdi || 'Nei',
   };
 }
 
 /**
+ * Wrap a promise with a timeout. Rejects if the promise doesn't resolve within `ms` milliseconds.
+ */
+function withTimeout(promise, ms, label = 'Operation') {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
  * Main scraping function called by the webhook handler.
+ * Wrapped in a 90-second timeout so it never hangs indefinitely.
  */
 async function scrapeOppdrag(address) {
   cleanupDebugFiles();
-  await findOppdrag(address);
-  const data = await extractOppdragData();
-  return data;
+
+  const SCRAPE_TIMEOUT = 90000; // 1.5 minutes
+
+  return withTimeout(
+    (async () => {
+      await findOppdrag(address);
+      const data = await extractOppdragData();
+      return data;
+    })(),
+    SCRAPE_TIMEOUT,
+    `Scraping "${address}"`
+  );
 }
 
 /**
