@@ -721,6 +721,24 @@ function withTimeout(promise, ms, label = 'Operation') {
 }
 
 /**
+ * Force-kill the browser. Used when a scrape times out and the page is unresponsive.
+ */
+async function destroyBrowser() {
+  if (browser) {
+    console.log('Force-killing browser process...');
+    try {
+      const proc = browser.process();
+      if (proc) proc.kill('SIGKILL');
+    } catch (e) {
+      console.error('Error killing browser process:', e.message);
+    }
+    browser = null;
+    page = null;
+    loggedIn = false;
+  }
+}
+
+/**
  * Main scraping function called by the webhook handler.
  * Wrapped in a 90-second timeout so it never hangs indefinitely.
  */
@@ -729,15 +747,23 @@ async function scrapeOppdrag(address) {
 
   const SCRAPE_TIMEOUT = 90000; // 1.5 minutes
 
-  return withTimeout(
-    (async () => {
-      await findOppdrag(address);
-      const data = await extractOppdragData();
-      return data;
-    })(),
-    SCRAPE_TIMEOUT,
-    `Scraping "${address}"`
-  );
+  try {
+    return await withTimeout(
+      (async () => {
+        await findOppdrag(address);
+        const data = await extractOppdragData();
+        return data;
+      })(),
+      SCRAPE_TIMEOUT,
+      `Scraping "${address}"`
+    );
+  } catch (err) {
+    if (err.message.includes('timed out')) {
+      console.error('Scrape timed out — destroying browser to recover.');
+      await destroyBrowser();
+    }
+    throw err;
+  }
 }
 
 /**
