@@ -532,65 +532,136 @@ async function navigateToTilstandsrapport(p) {
 }
 
 /**
- * Extract data from the tilstandsrapport page.
- * Reads the markedsverdi checkbox (mat-checkbox with aria-checked).
+ * Extract data from the tilstandsrapport Bygninger page.
+ * Reads: antall bygninger, boligtype, areal (BRA), and markedsverdi checkbox.
  */
 async function extractTilstandsrapportData(p) {
   console.log('Extracting data from tilstandsrapport...');
 
-  const reportData = await p.evaluate(() => {
+  // --- Navigate to Bygninger in sidebar ---
+  console.log('Navigating to Bygninger...');
+  const clickedBygninger = await p.evaluate(() => {
+    const link = document.querySelector('span#buildings');
+    if (link) { link.click(); return true; }
+    // Fallback: find sidebar link containing "Bygninger"
+    const links = document.querySelectorAll('nav a');
+    for (const a of links) {
+      if (a.textContent.includes('Bygninger')) { a.click(); return true; }
+    }
+    return false;
+  });
+
+  if (!clickedBygninger) {
+    console.log('Bygninger link not found in sidebar.');
+    return { antall_bygninger: null, boligtype: null, areal_bra: null, med_markedsverdi: 'Nei' };
+  }
+
+  await new Promise(r => setTimeout(r, 2000));
+  await waitForSpaReady(p);
+  await saveScreenshot('bygninger-tab');
+
+  // --- Extract building count and boligtype from Bygningsinformasjon ---
+  const bygningsData = await p.evaluate(() => {
     const result = {};
 
-    // Look for a mat-checkbox near a "Markedsverdi" label.
-    // The checkbox input has aria-checked="true" or "false".
-    const allLabels = document.querySelectorAll('label, span, div, mat-label');
-    let markedsverdiCheckbox = null;
+    // Antall bygninger: span.building-count or span[mattooltip="Totalt bygningstyper"]
+    const countEl = document.querySelector('span.building-count')
+                 || document.querySelector('[mattooltip="Totalt bygningstyper"]');
+    result.antall_bygninger = countEl ? parseInt(countEl.textContent.trim(), 10) : null;
 
-    for (const el of allLabels) {
-      const text = el.textContent?.trim().toLowerCase() || '';
-      if (text.includes('markedsverdi') && !text.includes('uten') && text.length < 40) {
-        // Look for a mat-checkbox in the same parent or nearby
-        const parent = el.closest('mat-checkbox, .mat-checkbox') || el.parentElement?.closest('mat-checkbox, .mat-checkbox');
-        if (parent) {
-          markedsverdiCheckbox = parent.querySelector('input[type="checkbox"]');
-          break;
-        }
-        // Also check siblings
-        const container = el.parentElement;
-        if (container) {
-          markedsverdiCheckbox = container.querySelector('mat-checkbox input[type="checkbox"], .mat-checkbox input[type="checkbox"]');
-          if (markedsverdiCheckbox) break;
-        }
-      }
-    }
-
-    // Fallback: find any mat-checkbox whose associated label contains "markedsverdi"
-    if (!markedsverdiCheckbox) {
-      const allCheckboxes = document.querySelectorAll('mat-checkbox, .mat-checkbox');
-      for (const cb of allCheckboxes) {
-        const cbText = cb.textContent?.trim().toLowerCase() || '';
-        if (cbText.includes('markedsverdi')) {
-          markedsverdiCheckbox = cb.querySelector('input[type="checkbox"]');
-          break;
-        }
-      }
-    }
-
-    if (markedsverdiCheckbox) {
-      const isChecked = markedsverdiCheckbox.getAttribute('aria-checked') === 'true'
-                     || markedsverdiCheckbox.checked;
-      result.med_markedsverdi = isChecked ? 'Ja' : 'Nei';
-      console.log('Markedsverdi checkbox found, aria-checked=' + markedsverdiCheckbox.getAttribute('aria-checked'));
-    } else {
-      // No checkbox found — default to Nei (not checked)
-      result.med_markedsverdi = 'Nei';
-      console.log('No markedsverdi checkbox found — defaulting to Nei');
-    }
+    // Boligtype: div.build-name-con
+    const typeEl = document.querySelector('div.build-name-con');
+    result.boligtype = typeEl?.textContent?.trim() || null;
 
     return result;
   });
 
-  return reportData;
+  console.log(`Bygninger: count=${bygningsData.antall_bygninger}, type=${bygningsData.boligtype}`);
+
+  // --- Click Etasjer tab to get areal ---
+  console.log('Clicking Etasjer tab...');
+  const clickedEtasjer = await p.evaluate(() => {
+    // Try mat-tab-label first
+    const tabs = document.querySelectorAll('[role="tab"], .mat-tab-label');
+    for (const tab of tabs) {
+      if (tab.textContent.trim().includes('Etasjer')) { tab.click(); return true; }
+    }
+    // Fallback: span with label="Etasjer"
+    const span = document.querySelector('span[label="Etasjer"]');
+    if (span) { span.click(); return true; }
+    return false;
+  });
+
+  let arealBra = null;
+  if (clickedEtasjer) {
+    await new Promise(r => setTimeout(r, 2000));
+
+    arealBra = await p.evaluate(() => {
+      // Primary: find disabled input in SUM BRA row
+      const allTds = document.querySelectorAll('td');
+      for (const td of allTds) {
+        if (td.textContent.trim() === 'SUM BRA') {
+          const row = td.closest('tr') || td.parentElement;
+          const input = row?.querySelector('input');
+          if (input?.value) return parseInt(input.value.trim(), 10);
+          // Fallback: span in same row
+          const span = row?.querySelector('span');
+          if (span?.textContent?.trim()) return parseInt(span.textContent.trim(), 10);
+        }
+      }
+
+      // Secondary fallback: Fra Ambita SUM row span
+      for (const td of allTds) {
+        if (td.textContent.trim() === 'SUM') {
+          const row = td.closest('tr');
+          if (row) {
+            const cells = row.querySelectorAll('td');
+            // Fra Ambita is typically the 3rd cell
+            for (const cell of cells) {
+              const span = cell.querySelector('span');
+              const val = span?.textContent?.trim();
+              if (val && /^\d+$/.test(val)) return parseInt(val, 10);
+            }
+          }
+        }
+      }
+
+      return null;
+    });
+
+    console.log(`Areal BRA: ${arealBra}`);
+  } else {
+    console.log('Etasjer tab not found.');
+  }
+
+  // --- Check markedsverdi sidebar checkbox ---
+  const medMarkedsverdi = await p.evaluate(() => {
+    // Find span#market-value, walk up to find the checkbox
+    const mvSpan = document.querySelector('span#market-value');
+    if (!mvSpan) return 'Nei'; // Section doesn't exist = no markedsverdi
+
+    let parent = mvSpan;
+    for (let i = 0; i < 6; i++) {
+      parent = parent.parentElement;
+      if (!parent) break;
+      const checkbox = parent.querySelector('input[type="checkbox"]');
+      if (checkbox) {
+        return checkbox.checked ? 'Ja' : 'Nei';
+      }
+    }
+
+    // Section exists in sidebar but no checkbox found — treat as Ja (section is present)
+    return 'Ja';
+  });
+
+  console.log(`Markedsverdi: ${medMarkedsverdi}`);
+
+  return {
+    antall_bygninger: bygningsData.antall_bygninger,
+    boligtype: bygningsData.boligtype,
+    areal_bra: arealBra,
+    med_markedsverdi: medMarkedsverdi,
+  };
 }
 
 /**
@@ -695,12 +766,31 @@ async function extractOppdragData() {
     console.log('Befaringer tab not found.');
   }
 
-  // No need to navigate back — we have all the data we need.
+  // --- Navigate back to Overview tab, then into Tilstandsrapport ---
+  console.log('Navigating back to Overview tab...');
+  const overviewLink = await p.$('a[routerlink="overview"], a[href*="overview"]');
+  if (overviewLink) {
+    await overviewLink.click();
+    await new Promise(r => setTimeout(r, 1000));
+    await p.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+    await waitForSpaReady(p);
+  }
+
+  // Navigate to tilstandsrapport for bygninger/areal/markedsverdi
+  let reportData = { antall_bygninger: null, boligtype: null, areal_bra: null, med_markedsverdi: 'Nei' };
+  const hasReport = await navigateToTilstandsrapport(p);
+  if (hasReport) {
+    reportData = await extractTilstandsrapportData(p);
+  }
+
   const result = {
     befaring_dato: befaringData.befaring_dato,
     befaring_klokkeslett: befaringData.befaring_klokkeslett,
     fakturareferanse: overviewData.fakturareferanse,
-    med_markedsverdi: null,
+    med_markedsverdi: reportData.med_markedsverdi,
+    antall_bygninger: reportData.antall_bygninger,
+    boligtype: reportData.boligtype,
+    areal_bra: reportData.areal_bra,
   };
 
   console.log('Extraction complete:', JSON.stringify(result));
