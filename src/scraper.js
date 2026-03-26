@@ -771,6 +771,20 @@ async function extractOppdragData() {
     reportData = await extractTilstandsrapportData(p);
   }
 
+  // Map IVIT boligtype to sheet categories
+  const BOLIGTYPE_MAP = {
+    'enebolig': 'Enebolig/fritidsbolig',
+    'fritidsbolig': 'Enebolig/fritidsbolig',
+    'tomannsbolig': 'Rekkehus/leilighet 2-4-mannsbolig',
+    'rekkehus': 'Rekkehus/leilighet 2-4-mannsbolig',
+    'leilighet': 'Leilighet',
+    'boligbygg med flere boenheter': 'Leilighet',
+    'næringsbygg': 'Næringsbygg',
+    'frittstående bygg': 'Frittstående bygg',
+  };
+  const rawBoligtype = (reportData.boligtype || '').trim();
+  const mappedBoligtype = BOLIGTYPE_MAP[rawBoligtype.toLowerCase()] || (rawBoligtype ? 'Annet' : null);
+
   const result = {
     befaring_dato: befaringData.befaring_dato,
     befaring_klokkeslett: befaringData.befaring_klokkeslett,
@@ -780,7 +794,7 @@ async function extractOppdragData() {
     selger_epost: overviewData.selger_epost,
     med_markedsverdi: reportData.med_markedsverdi,
     antall_bygninger: reportData.antall_bygninger,
-    boligtype: reportData.boligtype,
+    boligtype: mappedBoligtype,
     areal_bra: reportData.areal_bra,
   };
 
