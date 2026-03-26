@@ -686,8 +686,18 @@ async function extractOppdragData() {
     const deresRefInput = document.querySelector('input[data-fieldname="Deres ref"]');
     result.fakturareferanse = deresRefInput?.value?.trim() || null;
 
-    // Markedsverdi — will be determined from tilstandsrapport checkbox
-    result.med_markedsverdi = null;
+    // Selger (kunde) — first + last name
+    const firstName = document.querySelector('input[formcontrolname="customerFirstName"]')?.value?.trim() || '';
+    const lastName = document.querySelector('input[formcontrolname="customerLastName"]')?.value?.trim() || '';
+    result.selger = [firstName, lastName].filter(Boolean).join(' ') || null;
+
+    // Selger telefon — mobile first, fallback to work phone
+    const mobile = document.querySelector('#customerMobile')?.value?.trim() || '';
+    const workPhone = document.querySelector('#customerWorkPhone')?.value?.trim() || '';
+    result.selger_tlf = mobile || workPhone || null;
+
+    // Selger e-post
+    result.selger_epost = document.querySelector('#customerEmail')?.value?.trim() || null;
 
     return result;
   });
@@ -709,52 +719,30 @@ async function extractOppdragData() {
     befaringData = await p.evaluate(() => {
       const result = {};
 
-      // The befaring date is in a mat-datepicker-input (readonly input set by Angular)
-      const datePicker = document.querySelector('.mat-datepicker-input, input[matinput][readonly]');
-      if (datePicker && datePicker.value) {
-        result.befaring_dato = datePicker.value;
+      // Befaring date — find input with a DD.MM.YYYY value (not poststed or other readonly fields)
+      const dateInputs = document.querySelectorAll('.mat-datepicker-input');
+      for (const input of dateInputs) {
+        const val = input.value?.trim();
+        if (val && /^\d{2}\.\d{2}\.\d{4}$/.test(val)) {
+          result.befaring_dato = val;
+          break;
+        }
       }
 
-      // The time values are in mat-chip elements or time inputs
-      const chipTexts = [];
-      const chips = document.querySelectorAll('mat-chip, .mat-chip, .mat-chip-list input');
-      chips.forEach(c => {
-        const text = c.textContent?.trim().replace(/[×x✕close]/gi, '').trim();
-        if (text && text.match(/^\d{2}:\d{2}$/)) {
-          chipTexts.push(text);
+      // Befaring time — read HH:mm inputs first (most reliable)
+      const timeInputs = document.querySelectorAll('input[placeholder="HH:mm"]');
+      const times = [];
+      timeInputs.forEach(input => {
+        const val = input.value?.trim();
+        if (val && /^\d{2}:\d{2}$/.test(val)) {
+          times.push(val);
         }
       });
 
-      // Also check all visible text for time patterns near the date
-      if (chipTexts.length === 0) {
-        const pageText = document.body.innerText || '';
-        const timeMatches = pageText.match(/\d{2}:\d{2}/g);
-        if (timeMatches) {
-          chipTexts.push(...timeMatches.slice(0, 2));
-        }
-      }
-
-      if (chipTexts.length >= 2) {
-        result.befaring_klokkeslett = `${chipTexts[0]} - ${chipTexts[1]}`;
-      } else if (chipTexts.length === 1) {
-        result.befaring_klokkeslett = chipTexts[0];
-      }
-
-      // Read time inputs with HH:mm placeholder (Angular Material time pickers)
-      if (!result.befaring_klokkeslett) {
-        const timeInputs = document.querySelectorAll('input[placeholder="HH:mm"], input[data-placeholder="HH:mm"]');
-        const times = [];
-        timeInputs.forEach(input => {
-          const val = input.value?.trim();
-          if (val && val.match(/^\d{2}:\d{2}$/)) {
-            times.push(val);
-          }
-        });
-        if (times.length >= 2) {
-          result.befaring_klokkeslett = `${times[0]} - ${times[1]}`;
-        } else if (times.length === 1) {
-          result.befaring_klokkeslett = times[0];
-        }
+      if (times.length >= 2) {
+        result.befaring_klokkeslett = `${times[0]} - ${times[1]}`;
+      } else if (times.length === 1) {
+        result.befaring_klokkeslett = times[0];
       }
 
       if (!result.befaring_dato) result.befaring_dato = null;
@@ -787,6 +775,9 @@ async function extractOppdragData() {
     befaring_dato: befaringData.befaring_dato,
     befaring_klokkeslett: befaringData.befaring_klokkeslett,
     fakturareferanse: overviewData.fakturareferanse,
+    selger: overviewData.selger,
+    selger_tlf: overviewData.selger_tlf,
+    selger_epost: overviewData.selger_epost,
     med_markedsverdi: reportData.med_markedsverdi,
     antall_bygninger: reportData.antall_bygninger,
     boligtype: reportData.boligtype,
