@@ -67,11 +67,22 @@ function fetchIvitData(address) {
 }
 
 /**
- * Example: Write iVit data to a Google Sheet.
- * Call this from a trigger or manually.
+ * Process new IVIT rows in the Oppdrag sheet.
  *
- * Expects a sheet named "Oppdrag" with addresses in column A.
- * Writes results to columns B-E.
+ * Column layout:
+ *  A=Oppdragsnr  B=Dato mottatt  C=Kilde  D=Oppdragstype  E=Adresse
+ *  F=Oppdragsgiver  G=Selger  H=Selger tlf  I=Selger e-post
+ *  J=Megler/bestiller  K=Megler e-post  L=Faktura ref  M=Faktura sendes til
+ *  N=Fakturamotaker  O=Boligtype  P=Areal (m²)  Q=Antall tilleggsbygg
+ *  R=Rapporttype  S=Med markedsverdi  T=Timer  U=Pris inkl. mva
+ *  V=Pris eks. mva  W=MVA-beløp  X=Avstand (km t/r)  Y=Reisekostnad eks mva
+ *  Z=Reisekostnad inkl mva  AA=Sum (ferge/bom)  AB=Antall personer som deler reisekostnad
+ *  AC=Status  AD=Befaring dato  AE=Befaring klokkeslett  AF=Dato statusendring
+ *  AG=Timestamp (intern)  AH=Link til mappe  AI=Notater
+ *
+ * Only processes rows where:
+ *  - C (Kilde) = "IVIT"
+ *  - AD (Befaring dato) is empty (not yet scraped)
  */
 function processOppdragSheet() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Oppdrag');
@@ -81,37 +92,75 @@ function processOppdragSheet() {
   }
 
   const lastRow = sheet.getLastRow();
-  // Headers: A=Address, B=Befaring Dato, C=Befaring Klokkeslett, D=Fakturareferanse, E=Med Markedsverdi, F=Status
+  if (lastRow < 2) return;
+
+  // Column indices (1-based)
+  const COL = {
+    DATO_MOTTATT: 2,     // B
+    KILDE: 3,            // C
+    ADRESSE: 5,          // E
+    FAKTURA_REF: 12,     // L
+    MED_MARKEDSVERDI: 19,// S
+    BEFARING_DATO: 30,   // AD
+    BEFARING_KLOKKE: 31, // AE
+    TIMESTAMP: 33,       // AG
+    NOTATER: 35,         // AI
+  };
+
+  const CUTOFF = new Date('2026-03-17T08:23:00');
+  let processed = 0;
 
   for (let row = 2; row <= lastRow; row++) {
-    const address = sheet.getRange(row, 1).getValue();
-    const status = sheet.getRange(row, 6).getValue();
+    const kilde = sheet.getRange(row, COL.KILDE).getValue().toString().trim();
+    if (kilde !== 'IVIT') continue;
+
+    const datoMottatt = sheet.getRange(row, COL.DATO_MOTTATT).getValue();
+    if (!datoMottatt) continue;
+
+    // Parse date — handles both Date objects and strings like "17.03.2026 08:24"
+    let mottattDate;
+    if (datoMottatt instanceof Date) {
+      mottattDate = datoMottatt;
+    } else {
+      const parts = datoMottatt.toString().match(/(\d{2})\.(\d{2})\.(\d{4})\s*(\d{2}):(\d{2})/);
+      if (!parts) continue;
+      mottattDate = new Date(parts[3], parts[2] - 1, parts[1], parts[4], parts[5]);
+    }
+
+    // Skip legacy rows before cutoff
+    if (mottattDate <= CUTOFF) continue;
 
     // Skip already processed rows
-    if (!address || status === 'OK' || status === 'Error') continue;
+    const timestamp = sheet.getRange(row, COL.TIMESTAMP).getValue();
+    if (timestamp) continue;
 
-    Logger.log('Processing row ' + row + ': ' + address);
-    sheet.getRange(row, 6).setValue('Processing...');
-    SpreadsheetApp.flush();
+    const address = sheet.getRange(row, COL.ADRESSE).getValue().toString().trim();
+    if (!address) continue;
+
+    Logger.log('Row ' + row + ': scraping "' + address + '"');
 
     const result = fetchIvitData(address);
 
     if (result.success) {
       const d = result.data;
-      sheet.getRange(row, 2).setValue(d.befaring_dato || '');
-      sheet.getRange(row, 3).setValue(d.befaring_klokkeslett || '');
-      sheet.getRange(row, 4).setValue(d.fakturareferanse || '');
-      sheet.getRange(row, 5).setValue(d.med_markedsverdi || '');
-      sheet.getRange(row, 6).setValue('OK');
+      sheet.getRange(row, COL.BEFARING_DATO).setValue(d.befaring_dato || '');
+      sheet.getRange(row, COL.BEFARING_KLOKKE).setValue(d.befaring_klokkeslett || '');
+      sheet.getRange(row, COL.FAKTURA_REF).setValue(d.fakturareferanse || '');
+      sheet.getRange(row, COL.MED_MARKEDSVERDI).setValue(d.med_markedsverdi || '');
+      sheet.getRange(row, COL.TIMESTAMP).setValue(new Date());
+      Logger.log('Row ' + row + ': OK');
+      processed++;
     } else {
-      sheet.getRange(row, 6).setValue('Error: ' + (result.error || 'Unknown'));
+      // Write error to Notater column so it's visible but doesn't block re-processing
+      sheet.getRange(row, COL.NOTATER).setValue('iVit feil: ' + (result.error || 'Ukjent feil'));
+      Logger.log('Row ' + row + ': Error — ' + result.error);
     }
 
-    // Small delay between requests to avoid overwhelming the server
+    SpreadsheetApp.flush();
     Utilities.sleep(2000);
   }
 
-  Logger.log('Done processing all rows.');
+  Logger.log('Done. Processed ' + processed + ' row(s).');
 }
 
 /**

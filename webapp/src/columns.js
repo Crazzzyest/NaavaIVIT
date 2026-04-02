@@ -1,0 +1,48 @@
+// Column indices (1-based, matching the spreadsheet)
+const COL = {
+  KAN_FAKTURERES:      1,
+  OPPDRAGSNR:          2,
+  DATO_MOTTATT:        3,
+  KILDE:               4,
+  SCAN_IVIT:           5,
+  OPPDRAGSTYPE:        6,
+  ADRESSE:             7,
+  OPPDRAGSGIVER:       8,
+  SELGER:              9,
+  SELGER_TLF:          10,
+  SELGER_EPOST:        11,
+  MEGLER:              12,
+  MEGLER_EPOST:        13,
+  FAKTURA_REF:         14,
+  STATUS:              15,
+  FAKTURA_SENDES_TIL:  16,
+  FAKTURAMOTAKER:      17,
+  BOLIGTYPE:           18,
+  AREAL:               19,
+  ANTALL_TILLEGGSBYGG: 20,
+  RAPPORTTYPE:         21,
+  MED_MARKEDSVERDI:    22,
+  TIMER:               23,
+  PRIS_INKL:           24,
+  PRIS_EKS:            25,
+  MVA_BELOP:           26,
+  AVSTAND_KM:          27,
+  REISE_EKS:           28,
+  REISE_INKL:          29,
+  SUM_FERGE_BOM:       30,
+  ANTALL_DELE_REISE:   31,
+  BEFARING_DATO:       32,
+  BEFARING_KL:         33,
+  DATO_STATUSENDRING:  34,
+  TIMESTAMP:           35,
+  LINK_MAPPE:          36,
+  NOTATER:             37,
+  PRODUKTNUMMER:       38,
+  KOMMENTAR_REGNSKAP:  39,
+  KANSELLERT:          40,
+};
+
+const NUM_COLS = 40;
+const STATUS_COL_LETTER = 'O';
+
+module.exports = { COL, NUM_COLS, STATUS_COL_LETTER };
