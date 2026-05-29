@@ -342,12 +342,16 @@
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
     @media (max-width: 900px) {
-      .topnav { padding: 0 8px; gap: 3px; flex-wrap: wrap; height: auto; min-height: 56px; padding-top: 6px; padding-bottom: 6px; }
-      .topnav .logo { margin-right: 6px; font-size: 18px; }
-      .nav-btn { padding: 6px 10px; font-size: 12px; }
+      .topnav { padding: 6px 8px; gap: 4px; flex-wrap: wrap; height: auto; min-height: 56px; }
+      .topnav .logo { margin-right: 4px; font-size: 17px; }
+      .nav-btn { padding: 5px 8px; font-size: 12px; white-space: nowrap; min-width: 0; }
       .user-chip { display: none; }
-      .nav-right { margin-left: auto; gap: 6px; }
+      /* Put nav-right (mode badge + logg ut) on its own row, right-aligned */
+      .nav-right { width: 100%; margin-left: 0; order: 2; justify-content: flex-end; gap: 6px; }
       .mode-badge { padding: 3px 9px; font-size: 11px; }
+      /* Shorten "Manuell intake" label on mobile via CSS replacement trick */
+      .nav-btn[data-view="ny"] { font-size: 0 !important; }
+      .nav-btn[data-view="ny"]::before { content: "+ Nytt"; font-size: 12px; font-weight: 500; }
       .stats-strip { gap: 18px; padding: 12px 16px; }
       .stat-item { min-width: 110px; }
       .stat-item .val { font-size: 19px; }
