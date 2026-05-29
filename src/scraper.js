@@ -182,8 +182,15 @@ async function isOnLoginPage(p) {
 /**
  * Log into iVit.
  */
-async function login() {
+async function login(creds) {
   const p = await getPage();
+
+  // Resolve credentials: per-request > env-var fallback
+  const username = (creds && creds.username) || config.ivit.username;
+  const password = (creds && creds.password) || config.ivit.password;
+  if (!username || !password) {
+    throw new Error('IVIT credentials missing — provide via request body (ivitUsername/ivitPassword) or set IVIT_USERNAME/IVIT_PASSWORD env vars.');
+  }
 
   console.log('Navigating to iVit...');
   await gotoAndWait(p, config.ivit.baseUrl);
@@ -264,12 +271,12 @@ async function login() {
     throw new Error('Could not find password input field on login page');
   }
 
-  // Clear and type credentials
+  // Clear and type credentials (resolved at start of function)
   await usernameField.click({ clickCount: 3 });
-  await usernameField.type(config.ivit.username);
+  await usernameField.type(username);
 
   await passwordField.click({ clickCount: 3 });
-  await passwordField.type(config.ivit.password);
+  await passwordField.type(password);
 
   // Find and click submit button
   const submitSelectors = [
@@ -326,18 +333,18 @@ async function login() {
 /**
  * Ensure we're logged in, re-login if session expired.
  */
-async function ensureLoggedIn() {
+async function ensureLoggedIn(creds) {
   const p = await getPage();
   if (!loggedIn || (await isOnLoginPage(p))) {
-    await login();
+    await login(creds);
   }
 }
 
 /**
  * Search for an oppdrag by address using the global search.
  */
-async function findOppdrag(address) {
-  await ensureLoggedIn();
+async function findOppdrag(address, creds) {
+  await ensureLoggedIn(creds);
   const p = await getPage();
 
   console.log(`Searching for oppdrag: "${address}"`);
@@ -351,8 +358,8 @@ async function findOppdrag(address) {
   // Re-check login after navigation
   if (await isOnLoginPage(p)) {
     loggedIn = false;
-    await login();
-    return findOppdrag(address);
+    await login(creds);
+    return findOppdrag(address, creds);
   }
 
   // Use the global search field: ivit-global-search input
@@ -837,7 +844,7 @@ async function destroyBrowser() {
  * Main scraping function called by the webhook handler.
  * Wrapped in a 90-second timeout so it never hangs indefinitely.
  */
-async function scrapeOppdrag(address) {
+async function scrapeOppdrag(address, creds) {
   cleanupDebugFiles();
 
   const SCRAPE_TIMEOUT = 90000; // 1.5 minutes
@@ -845,7 +852,7 @@ async function scrapeOppdrag(address) {
   try {
     return await withTimeout(
       (async () => {
-        await findOppdrag(address);
+        await findOppdrag(address, creds);
         const data = await extractOppdragData();
         return data;
       })(),

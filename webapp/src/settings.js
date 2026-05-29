@@ -66,6 +66,10 @@ const DEFAULTS = {
   'recipients.ownerEmail':          'jacob@naava.no',
   'recipients.accountantEmail':     'regnskap@naava.no',
   'recipients.testSender':          'edsongreistad99@gmail.com',
+
+  // IVIT credentials — sent to scraper-service per request, replaces env vars there
+  'ivit.username':                  '',
+  'ivit.password':                  '',
 };
 
 // Field type metadata for coercion + UI hints
@@ -105,6 +109,9 @@ const SCHEMA = {
   'recipients.ownerEmail':          { type: 'email', label: 'Eier e-post' },
   'recipients.accountantEmail':     { type: 'email', label: 'Regnskap e-post' },
   'recipients.testSender':          { type: 'email', label: 'Test-avsender (kun TEST_MODE)' },
+
+  'ivit.username':                  { type: 'text', label: 'IVIT brukernavn' },
+  'ivit.password':                  { type: 'password', label: 'IVIT passord' },
 };
 
 // ============================================================

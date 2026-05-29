@@ -575,6 +575,12 @@
     </div>
 
     <div class="admin-section">
+      <h2>IVIT-tilgang</h2>
+      <div class="section-hint">Brukernavn og passord til IVIT-systemet. Webappen sender dem til scraper-tjenesten ved hver henting, så du kan bytte passord her uten å røre Sliplane-env. Passordet er maskert i visningen.</div>
+      <div id="ivitSection">Laster…</div>
+    </div>
+
+    <div class="admin-section">
       <h2>Prisliste</h2>
       <div class="section-hint">Prisene brukes når et oppdrag opprettes eller endres. <strong>Tilstandsrapport pris</strong> = standard. <strong>m/markedsverdi pris</strong> = brukes når "Med markedsverdi" er huket av på oppdraget. Endringer trer i kraft umiddelbart for nye prisberegninger. Lagres i <code>Prisliste</code>-fanen i sheetet.</div>
       <table class="price-table" id="priceTable">
@@ -1030,7 +1036,7 @@
       const modal = document.getElementById('modal');
       modal.querySelectorAll('[data-field]').forEach(el => {
         const fieldName = el.dataset.field;
-        const isText = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number' || el.type === 'tel' || el.type === 'email' || el.type === 'date' || el.type === 'time') || el.tagName === 'TEXTAREA';
+        const isText = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number' || el.type === 'tel' || el.type === 'email' || el.type === 'date' || el.type === 'time' || el.type === 'password') || el.tagName === 'TEXTAREA';
         if (el.tagName === 'SELECT' || el.type === 'checkbox') {
           el.addEventListener('change', () => {
             const value = el.type === 'checkbox' ? el.checked : el.value;
@@ -1634,8 +1640,42 @@
       }
       document.getElementById('recipientsSection').innerHTML = recHtml;
 
+      // --- IVIT credentials ---
+      const ivitKeys = ['ivit.username', 'ivit.password'];
+      let ivitHtml = '';
+      for (const key of ivitKeys) {
+        const sp = schema[key] || {};
+        const isPassword = sp.type === 'password';
+        const value = s[key] || '';
+        // For password: show masked input + a toggle eye icon
+        if (isPassword) {
+          const masked = value ? '••••••••' : '';
+          const ctrl = `
+            <input type="password" data-setting="${key}" value="${escapeHtml(value)}" autocomplete="new-password" placeholder="${masked || '(ikke satt)'}">
+            <button type="button" class="btn btn-outline" style="padding: 5px 10px; font-size: 12px;" onclick="togglePasswordVisibility('${key}', this)">Vis</button>
+          `;
+          ivitHtml += adminRow(key, sp.label || key, '', ctrl);
+        } else {
+          const ctrl = `<input type="text" data-setting="${key}" value="${escapeHtml(value)}" autocomplete="off">`;
+          ivitHtml += adminRow(key, sp.label || key, '', ctrl);
+        }
+      }
+      document.getElementById('ivitSection').innerHTML = ivitHtml;
+
       // Bind all settings inputs
       bindSettingsInputs();
+    }
+
+    function togglePasswordVisibility(key, btn) {
+      const input = document.querySelector(`[data-setting="${key}"]`);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Skjul';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Vis';
+      }
     }
 
     const _settingsTimers = {};

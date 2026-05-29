@@ -20,9 +20,10 @@ const config = {
   },
 };
 
-// Validate required vars
+// Validate fallback credentials. Per-request creds (sent in webhook body)
+// take precedence; env vars only act as fallback.
 if (!config.ivit.username || !config.ivit.password) {
-  console.warn('WARNING: IVIT_USERNAME and IVIT_PASSWORD are not set in .env — scraping will fail until configured.');
+  console.log('INFO: IVIT_USERNAME/IVIT_PASSWORD env vars not set. Caller must supply ivitUsername+ivitPassword in each /webhook request body, or scraping will fail.');
 }
 
 module.exports = config;

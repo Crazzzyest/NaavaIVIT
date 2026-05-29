@@ -39,7 +39,7 @@ function validateRequest(req, res, next) {
  * POST /webhook — main endpoint.
  */
 app.post('/webhook', validateRequest, async (req, res) => {
-  const { address } = req.body || {};
+  const { address, ivitUsername, ivitPassword } = req.body || {};
 
   if (!address || typeof address !== 'string' || address.trim().length === 0) {
     return res.status(400).json({
@@ -49,10 +49,15 @@ app.post('/webhook', validateRequest, async (req, res) => {
   }
 
   const trimmedAddress = address.trim();
-  console.log(`\n=== Webhook received: "${trimmedAddress}" ===`);
+  // If caller supplied per-request credentials, use those. Else scraper falls
+  // back to its IVIT_USERNAME/IVIT_PASSWORD env vars.
+  const creds = (ivitUsername && ivitPassword)
+    ? { username: ivitUsername, password: ivitPassword }
+    : null;
+  console.log(`\n=== Webhook received: "${trimmedAddress}" (creds: ${creds ? 'per-request' : 'env-vars'}) ===`);
 
   try {
-    const data = await scrapeOppdrag(trimmedAddress);
+    const data = await scrapeOppdrag(trimmedAddress, creds);
 
     if (data.dryRun) {
       return res.json({

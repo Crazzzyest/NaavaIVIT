@@ -8,10 +8,17 @@ async function fetchIvitData(address) {
     return { success: false, error: 'Tom adresse' };
   }
 
+  // Read IVIT credentials from settings (Innstillinger-sheet). If blank, the
+  // scraper falls back to its own env vars (back-compat with previous deploy).
+  const settings = await require('./settings').get();
+  const body = { address: address.trim() };
+  if (settings['ivit.username']) body.ivitUsername = settings['ivit.username'];
+  if (settings['ivit.password']) body.ivitPassword = settings['ivit.password'];
+
   const options = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address: address.trim() }),
+    body: JSON.stringify(body),
   };
 
   if (config.ivit.webhookSecret) {
@@ -20,9 +27,9 @@ async function fetchIvitData(address) {
 
   try {
     const res = await fetch(config.ivit.webhookUrl, options);
-    const body = await res.json();
-    if (res.ok && body.success) return body;
-    return { success: false, error: body.error || 'Ukjent feil fra Webhook' };
+    const responseBody = await res.json();
+    if (res.ok && responseBody.success) return responseBody;
+    return { success: false, error: responseBody.error || 'Ukjent feil fra Webhook' };
   } catch (e) {
     return { success: false, error: 'Forespørsel feilet: ' + e.message };
   }
