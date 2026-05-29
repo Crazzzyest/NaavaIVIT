@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Naava Takst</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; }
+
+    /* ── Top nav ── */
+    .topnav { background: #1a5c2a; display: flex; align-items: center; padding: 0 24px; height: 56px; gap: 8px; }
+    .topnav .logo { color: white; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; margin-right: 24px; }
+    .nav-btn { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); border: none; padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; text-decoration: none; }
+    .nav-btn:hover { background: rgba(255,255,255,0.22); color: white; }
+    .nav-btn.active { background: white; color: #1a5c2a; font-weight: 600; }
+    .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .mode-badge { padding: 4px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .mode-badge.prod { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+    .mode-badge.test { background: #ff9800; color: #333; }
+    .mode-badge.demo { background: #ffeb3b; color: #333; }
+    .user-chip { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.9); font-size: 13px; padding: 4px 10px; border-radius: 16px; background: rgba(255,255,255,0.08); }
+    .user-chip .avatar { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.2); object-fit: cover; }
+
+    /* ── Demo banner ── */
+    .demo-banner { background: #fff8c5; border-bottom: 1px solid #f0d97d; color: #6b5900; padding: 10px 24px; font-size: 13px; display: none; align-items: center; gap: 10px; }
+    .demo-banner.on { display: flex; }
+    .demo-banner strong { color: #5c4a00; }
+
+    /* ── Filter tabs ── */
+    .tab-bar { background: white; border-bottom: 1px solid #e0e0e0; padding: 0 24px; display: flex; align-items: center; gap: 0; overflow-x: auto; }
+    .tab { padding: 14px 22px; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; color: #666; transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+    .tab:hover { color: #333; background: #f9f9f9; }
+    .tab.active { color: #1a5c2a; border-bottom-color: #1a5c2a; font-weight: 600; }
+    .tab .count { background: #e8e8e8; color: #555; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+    .tab.active .count { background: #1a5c2a; color: white; }
+    .tab-color { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Stats strip ── */
+    .stats-strip { background: white; border-bottom: 1px solid #e0e0e0; padding: 16px 24px; display: flex; gap: 32px; overflow-x: auto; }
+    .stat-item { display: flex; flex-direction: column; min-width: 140px; }
+    .stat-item .label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat-item .val { font-size: 22px; font-weight: 700; color: #1a5c2a; }
+    .stat-item .val.warn { color: #e65100; }
+
+    /* ── Toolbar ── */
+    .toolbar { padding: 16px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .search-box { flex: 1; min-width: 200px; max-width: 400px; padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.15s; }
+    .search-box:focus { border-color: #1a5c2a; }
+    .toolbar-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+    .btn { padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-primary { background: #1a5c2a; color: white; }
+    .btn-outline { background: white; color: #555; border: 1px solid #ddd; }
+    .btn-outline:hover { background: #f5f5f5; }
+    .btn-warn { background: #ff9800; color: white; }
+
+    /* ── Oppdrag cards ── */
+    .card-list { padding: 0 24px 24px; }
+    .oppdrag-card { background: white; border-radius: 10px; padding: 20px 24px; margin-bottom: 12px; display: flex; align-items: center; gap: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: box-shadow 0.15s; cursor: pointer; }
+    .oppdrag-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+
+    .card-icon { width: 52px; height: 52px; border-radius: 8px; background: #e8f5e9; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+
+    .card-main { flex: 1; min-width: 0; }
+    .card-address { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .card-address a { color: #222; text-decoration: none; }
+    .card-address a:hover { color: #1a5c2a; text-decoration: underline; }
+    .card-pin { color: #e65100; font-size: 16px; }
+    .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .card-tag { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+    .tag-mottatt { background: #fff3e0; color: #e65100; }
+    .tag-avtalt { background: #e3f2fd; color: #1565c0; }
+    .tag-befart { background: #e8eaf6; color: #283593; }
+    .tag-utkast { background: #fce4ec; color: #c62828; }
+    .tag-endelig { background: #f3e5f5; color: #6a1b9a; }
+    .tag-faktureres { background: #e8f5e9; color: #2e7d32; }
+    .tag-fakturert { background: #c8e6c9; color: #1b5e20; }
+    .tag-fullfort { background: #d9ead3; color: #1a5c2a; }
+    .tag-kansellert { background: #eeeeee; color: #777; }
+    .tag-type { background: #f5f5f5; color: #666; }
+    .card-dates { font-size: 12px; color: #999; margin-top: 4px; }
+
+    .card-info { display: flex; flex-direction: column; align-items: flex-start; min-width: 160px; }
+    .card-info .name { font-size: 14px; font-weight: 500; color: #333; }
+    .card-info .phone { font-size: 13px; color: #888; }
+
+    .card-price { text-align: right; min-width: 110px; }
+    .card-price .amount { font-size: 16px; font-weight: 700; color: #1a5c2a; }
+    .card-price .sub { font-size: 11px; color: #999; }
+
+    /* ── Pagination ── */
+    .pagination { padding: 12px 24px 24px; display: flex; justify-content: flex-end; align-items: center; gap: 12px; font-size: 13px; color: #888; }
+    .pagination select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+    .page-btn { width: 32px; height: 32px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #555; }
+    .page-btn:hover { background: #f5f5f5; }
+    .page-btn:disabled { opacity: 0.3; cursor: default; }
+
+    /* ── Empty / loading ── */
+    .loading { text-align: center; padding: 60px; color: #888; }
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #e0e0e0; border-top-color: #1a5c2a; border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 12px; }
+    .empty { text-align: center; padding: 60px; color: #aaa; font-size: 15px; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 24px; border-radius: 8px; color: white; font-size: 14px; z-index: 1000; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+    .toast.success { background: #2e7d32; }
+    .toast.error { background: #c62828; }
+    .toast.show { display: block; animation: slideIn 0.3s ease; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── Dashboard view ── */
+    .dashboard-view { display: none; padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .dashboard-view.on { display: block; }
+    .dash-section { background: white; border-radius: 10px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .dash-section h2 { font-size: 16px; color: #1a5c2a; margin: 0 0 14px; font-weight: 600; }
+    .dash-section h2 .sub { font-size: 12px; color: #999; font-weight: normal; margin-left: 8px; }
+
+    /* KPI cards grid */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .kpi-card { background: #fafafa; border-radius: 8px; padding: 16px 18px; border: 1px solid #f0f0f0; }
+    .kpi-card .kpi-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .kpi-card .kpi-value { font-size: 24px; font-weight: 700; color: #1a5c2a; line-height: 1.15; }
+    .kpi-card .kpi-sub { font-size: 12px; color: #999; margin-top: 4px; }
+    .kpi-card.highlight { background: linear-gradient(135deg, #1a5c2a 0%, #2d7a3e 100%); border-color: transparent; }
+    .kpi-card.highlight .kpi-label { color: rgba(255,255,255,0.8); }
+    .kpi-card.highlight .kpi-value { color: white; }
+    .kpi-card.highlight .kpi-sub { color: rgba(255,255,255,0.7); }
+    .kpi-card.warn { background: #fff8e1; border-color: #ffe0a0; }
+    .kpi-card.warn .kpi-value { color: #e65100; }
+
+    /* Horizontal bars */
+    .bar-list { display: flex; flex-direction: column; gap: 6px; }
+    .bar-row { display: grid; grid-template-columns: 200px 1fr 90px; gap: 10px; align-items: center; padding: 4px 0; }
+    .bar-row .bar-label { font-size: 13px; color: #444; display: flex; align-items: center; gap: 8px; }
+    .bar-row .bar-label .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .bar-row .bar-track { position: relative; height: 18px; background: #f3f3f3; border-radius: 4px; overflow: hidden; }
+    .bar-row .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #2e7d32 0%, #1a5c2a 100%); border-radius: 4px; transition: width 0.4s; }
+    .bar-row .bar-value { font-size: 13px; color: #222; font-weight: 600; text-align: right; }
+
+    /* Vertical trend bars */
+    .trend-chart { display: flex; align-items: flex-end; gap: 8px; height: 220px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; }
+    .trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+    .trend-col .trend-bar-wrap { flex: 1; display: flex; align-items: flex-end; justify-content: center; width: 100%; padding: 0 4px; min-height: 1px; }
+    .trend-col .trend-bar { width: 100%; max-width: 44px; background: linear-gradient(180deg, #2e7d32 0%, #1a5c2a 100%); border-radius: 4px 4px 0 0; min-height: 2px; transition: height 0.4s; cursor: default; position: relative; }
+    .trend-col .trend-bar:hover { background: linear-gradient(180deg, #43a047 0%, #2e7d32 100%); }
+    .trend-col .trend-bar .trend-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; margin-bottom: 4px; }
+    .trend-col .trend-bar:hover .trend-tooltip { opacity: 1; }
+    .trend-col .trend-label { font-size: 11px; color: #999; text-align: center; line-height: 1.2; }
+    .trend-col .trend-value { font-size: 11px; color: #1a5c2a; font-weight: 600; }
+    .trend-zero { background: #e0e0e0 !important; }
+
+    .empty-row { padding: 20px; text-align: center; color: #999; font-size: 13px; }
+
+    @media (max-width: 700px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .kpi-card { padding: 12px 14px; }
+      .kpi-card .kpi-value { font-size: 18px; word-break: break-word; }
+      .kpi-card .kpi-label { font-size: 10px; }
+      .kpi-card .kpi-sub { font-size: 11px; }
+      .bar-row { grid-template-columns: 130px 1fr 50px; gap: 6px; }
+      .bar-row .bar-label { font-size: 11px; }
+      .bar-row .bar-value { font-size: 12px; }
+      .dashboard-view { padding: 12px; }
+      .dash-section { padding: 16px; }
+      .trend-chart { height: 160px; gap: 4px; }
+      .trend-col .trend-label { font-size: 9px; }
+      .trend-col .trend-value { font-size: 9px; }
+    }
+
+    /* ── Admin view ── */
+    .admin-view { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+    .admin-view.on { display: block; }
+    .admin-section { background: white; border-radius: 10px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .admin-section h2 { font-size: 16px; color: #1a5c2a; border-bottom: 1px solid #e8e8e8; padding-bottom: 10px; margin: 0 0 16px; font-weight: 600; }
+    .admin-section .section-hint { font-size: 13px; color: #888; margin-top: -6px; margin-bottom: 16px; }
+    .admin-row { display: grid; grid-template-columns: 280px 1fr 160px; gap: 16px; padding: 10px 0; align-items: center; border-bottom: 1px solid #f5f5f5; }
+    .admin-row:last-child { border-bottom: none; }
+    .admin-row .label { font-size: 13px; color: #333; font-weight: 500; }
+    .admin-row .label .sub { display: block; font-size: 11px; color: #999; font-weight: normal; margin-top: 2px; }
+    .admin-row .value-cell { display: flex; align-items: center; gap: 10px; }
+    .admin-row input[type="text"], .admin-row input[type="number"], .admin-row input[type="email"], .admin-row select {
+      font-family: inherit; font-size: 14px; padding: 8px 12px;
+      border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 0;
+      background: white;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .admin-row input:focus, .admin-row select:focus { outline: none; border-color: #1a5c2a; box-shadow: 0 0 0 3px rgba(26,92,42,0.12); }
+    .admin-row textarea {
+      font-family: inherit; font-size: 13px; padding: 10px 12px;
+      border: 1px solid #ddd; border-radius: 6px;
+      width: 100%; min-height: 120px; resize: vertical;
+      background: white;
+      transition: border-color 0.15s;
+    }
+    .admin-row textarea:focus { outline: none; border-color: #1a5c2a; box-shadow: 0 0 0 3px rgba(26,92,42,0.12); }
+    .admin-row.full { grid-template-columns: 1fr; }
+    .admin-row.full .label { margin-bottom: 6px; }
+    .admin-row .actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .admin-row .indicator { font-size: 11px; color: #999; min-width: 100px; text-align: right; }
+    .admin-row .indicator.saving { color: #ff9800; }
+    .admin-row .indicator.saved { color: #2e7d32; }
+    .admin-row .indicator.error { color: #c62828; }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 24px; transition: 0.2s; }
+    .switch .slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+    .switch input:checked + .slider { background: #1a5c2a; }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .switch-label { font-size: 14px; color: #222; flex: 1; }
+
+    /* Cron preset chips */
+    .cron-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .cron-preset { background: #f5f5f5; color: #555; padding: 3px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; border: 1px solid transparent; }
+    .cron-preset:hover { background: #e8f5e9; color: #1a5c2a; border-color: #c8e6c9; }
+
+    /* Activity log */
+    .activity-log { background: white; border-radius: 10px; padding: 0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .activity-log .log-header { padding: 16px 24px; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; }
+    .activity-log .log-header h2 { font-size: 16px; color: #1a5c2a; margin: 0; }
+    .activity-log .log-header .auto-refresh { font-size: 11px; color: #888; }
+    .activity-log .log-list { max-height: 480px; overflow-y: auto; }
+    .activity-log .log-entry { padding: 10px 24px; border-bottom: 1px solid #f5f5f5; display: grid; grid-template-columns: 130px 100px 1fr; gap: 12px; align-items: start; font-size: 13px; }
+    .activity-log .log-entry:last-child { border-bottom: none; }
+    .activity-log .log-entry .ts { color: #999; font-size: 12px; }
+    .activity-log .log-entry .type { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .activity-log .log-entry .type-patch { background: #e3f2fd; color: #1565c0; }
+    .activity-log .log-entry .type-status { background: #e8f5e9; color: #2e7d32; }
+    .activity-log .log-entry .type-cron { background: #f3e5f5; color: #6a1b9a; }
+    .activity-log .log-entry .type-cron-error { background: #fdecea; color: #c62828; }
+    .activity-log .log-entry .type-register { background: #fff3e0; color: #e65100; }
+    .activity-log .log-entry .type-faktura { background: #c8e6c9; color: #1b5e20; }
+    .activity-log .log-entry .type-login { background: #eeeeee; color: #555; }
+    .activity-log .log-entry .type-error { background: #fdecea; color: #c62828; }
+    .activity-log .log-entry .type-admin { background: #fff8e1; color: #ff8f00; }
+    .activity-log .log-empty { padding: 40px; color: #aaa; text-align: center; font-size: 14px; }
+
+    .system-status { display: flex; gap: 12px; flex-wrap: wrap; }
+    .system-status .chip { padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; }
+    .system-status .chip.prod { background: #e8f5e9; color: #1a5c2a; }
+    .system-status .chip.test { background: #fff3e0; color: #e65100; }
+    .system-status .chip.demo { background: #fffde7; color: #5c4a00; }
+    .system-status .chip.on { background: #e3f2fd; color: #1565c0; }
+    .system-status .chip.off { background: #eeeeee; color: #777; }
+
+    @media (max-width: 900px) {
+      .admin-row { grid-template-columns: 1fr; gap: 6px; }
+      .admin-row .indicator { text-align: left; }
+      .admin-row .label { font-weight: 600; }
+      .activity-log .log-entry { grid-template-columns: 1fr; gap: 4px; }
+    }
+
+    /* ── Intake form ── */
+    .intake-form { padding: 24px; }
+    .intake-form .form-row { display: grid; grid-template-columns: 180px 1fr; gap: 16px; align-items: start; margin-bottom: 14px; }
+    .intake-form .form-row label { font-size: 13px; color: #555; padding-top: 9px; font-weight: 500; }
+    .intake-form .form-row label.required::after { content: ' *'; color: #c62828; }
+    .intake-form input, .intake-form select, .intake-form textarea {
+      font-family: inherit; font-size: 14px;
+      padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px;
+      width: 100%;
+      background: white;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .intake-form input:focus, .intake-form select:focus, .intake-form textarea:focus {
+      outline: none; border-color: #1a5c2a; box-shadow: 0 0 0 3px rgba(26,92,42,0.12);
+    }
+    .intake-form input.invalid { border-color: #c62828; }
+    .intake-form textarea { min-height: 70px; resize: vertical; }
+    .intake-form .hint { font-size: 12px; color: #888; margin-top: 4px; }
+    .intake-form .field-error { font-size: 12px; color: #c62828; margin-top: 4px; min-height: 14px; }
+
+    @media (max-width: 700px) {
+      .intake-form .form-row { grid-template-columns: 1fr; gap: 4px; }
+      .intake-form .form-row label { padding-top: 0; }
+    }
+
+    /* ── Detail modal — editable fields ── */
+    .field input[type="text"], .field input[type="number"], .field input[type="email"], .field input[type="tel"], .field input[type="date"], .field input[type="time"], .field select, .field textarea {
+      font-family: inherit; font-size: 14px; color: #222;
+      border: 1px solid transparent; border-radius: 4px;
+      padding: 4px 6px; margin: -4px -6px;
+      width: 100%; max-width: 100%;
+      background: transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .field input:hover, .field select:hover, .field textarea:hover { border-color: #e0e0e0; background: #fafafa; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #1a5c2a; background: white; box-shadow: 0 0 0 3px rgba(26,92,42,0.12); }
+    .field textarea { resize: vertical; min-height: 60px; }
+    .field .save-indicator { font-size: 11px; color: #999; margin-top: 2px; min-height: 14px; }
+    .field .save-indicator.saving { color: #ff9800; }
+    .field .save-indicator.saved { color: #2e7d32; }
+    .field .save-indicator.error { color: #c62828; }
+    .field-checkbox { display: flex; align-items: center; gap: 8px; }
+    .field-checkbox input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; margin: 0; padding: 0; }
+
+    /* ── Status change buttons in modal footer ── */
+    .modal-footer .status-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-right: auto; }
+    .modal-footer .status-actions .btn { font-size: 12px; padding: 7px 12px; }
+    .status-btn-mottatt { background: #fff3e0; color: #e65100; }
+    .status-btn-avtalt { background: #e3f2fd; color: #1565c0; }
+    .status-btn-befart { background: #e8eaf6; color: #283593; }
+    .status-btn-faktureres { background: #e8f5e9; color: #2e7d32; }
+    .status-btn-kansellert { background: #eeeeee; color: #555; }
+
+    /* ── Detail modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; display: none; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; }
+    .modal-overlay.on { display: flex; animation: fadeIn 0.15s ease; }
+    .modal-panel { background: white; width: 100%; max-width: 820px; border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.25); overflow: hidden; animation: slideUp 0.2s ease; }
+    .modal-header { background: #1a5c2a; color: white; padding: 18px 24px; display: flex; align-items: center; gap: 16px; }
+    .modal-header .h-left { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .modal-header h2 { font-size: 18px; margin: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .modal-header .h-tag { background: rgba(255,255,255,0.18); padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+    .modal-close { background: rgba(255,255,255,0.12); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: rgba(255,255,255,0.25); }
+
+    .modal-body { padding: 24px; max-height: calc(100vh - 200px); overflow-y: auto; }
+    .modal-section { margin-bottom: 24px; }
+    .modal-section:last-child { margin-bottom: 0; }
+    .modal-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: #1a5c2a; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e8e8e8; font-weight: 600; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; }
+    .field-grid.cols-1 { grid-template-columns: 1fr; }
+    .field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .field .label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.4px; }
+    .field .value { font-size: 14px; color: #222; word-break: break-word; }
+    .field .value.muted { color: #aaa; font-style: italic; }
+    .field .value a { color: #1a5c2a; text-decoration: none; }
+    .field .value a:hover { text-decoration: underline; }
+    .field .value.notes { white-space: pre-wrap; background: #fffbe6; padding: 10px 12px; border-radius: 6px; border-left: 3px solid #ffd54f; }
+    .field .value.kommentar { white-space: pre-wrap; background: #fff3e0; padding: 10px 12px; border-radius: 6px; border-left: 3px solid #ff9800; }
+    .field .value.price-big { font-size: 22px; font-weight: 700; color: #1a5c2a; }
+
+    .modal-footer { background: #fafafa; padding: 14px 24px; border-top: 1px solid #e8e8e8; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .modal-footer .footer-info { margin-right: auto; font-size: 12px; color: #888; }
+    .modal-footer .btn { font-size: 13px; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    @media (max-width: 900px) {
+      .topnav { padding: 0 8px; gap: 3px; flex-wrap: wrap; height: auto; min-height: 56px; padding-top: 6px; padding-bottom: 6px; }
+      .topnav .logo { margin-right: 6px; font-size: 18px; }
+      .nav-btn { padding: 6px 10px; font-size: 12px; }
+      .user-chip { display: none; }
+      .nav-right { margin-left: auto; gap: 6px; }
+      .mode-badge { padding: 3px 9px; font-size: 11px; }
+      .stats-strip { gap: 18px; padding: 12px 16px; }
+      .stat-item { min-width: 110px; }
+      .stat-item .val { font-size: 19px; }
+      .toolbar { padding: 12px 16px; }
+      .card-list { padding: 0 12px 12px; }
+
+      /* Card layout: grid-based stacking */
+      .oppdrag-card {
+        display: grid;
+        grid-template-columns: 44px 1fr auto;
+        grid-template-rows: auto auto;
+        gap: 6px 12px;
+        padding: 14px 16px;
+        align-items: start;
+      }
+      .card-icon { grid-column: 1; grid-row: 1 / span 2; width: 44px; height: 44px; font-size: 18px; align-self: center; }
+      .card-main { grid-column: 2 / 4; grid-row: 1; min-width: 0; }
+      .card-main .card-address { font-size: 14px; }
+      .card-main .card-dates { font-size: 11px; margin-top: 2px; }
+      .card-info { grid-column: 2; grid-row: 2; flex-direction: row !important; gap: 8px; align-items: baseline; min-width: 0; }
+      .card-info .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card-info .phone { font-size: 12px; flex-shrink: 0; color: #999; }
+      .card-price { grid-column: 3; grid-row: 2; text-align: right; align-self: center; min-width: auto; }
+      .card-price .amount { font-size: 15px; }
+      .card-price .sub { font-size: 10px; }
+
+      /* Modal full-screen on mobile */
+      .modal-overlay { padding: 0; }
+      .modal-panel { border-radius: 0; min-height: 100vh; max-width: 100%; }
+      .modal-header { padding: 14px 16px; gap: 10px; }
+      .modal-header h2 { font-size: 14px; }
+      .modal-header .h-tag { font-size: 10px; padding: 3px 7px; white-space: nowrap; flex-shrink: 0; }
+      .modal-header .h-left { gap: 8px; }
+      .modal-body { max-height: none; padding: 16px; }
+      .modal-footer { padding: 12px 16px; }
+      .field-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top navigation -->
+  <nav class="topnav">
+    <div class="logo">NAAVA</div>
+    <button class="nav-btn active" data-view="oppdrag" onclick="setView('oppdrag')">Oppdrag</button>
+    <button class="nav-btn" data-view="ny" onclick="setView('ny')">Manuell intake</button>
+    <button class="nav-btn" data-view="dashboard" onclick="setView('dashboard')">Dashboard</button>
+    <button class="nav-btn" data-view="admin" onclick="setView('admin')">Admin</button>
+    <div class="nav-right">
+      <span class="mode-badge prod" id="modeLabel">...</span>
+      <span class="user-chip" id="userChip" title=""><span id="userEmail">...</span></span>
+      <a class="nav-btn" href="/auth/logout">Logg ut</a>
+    </div>
+  </nav>
+
+  <!-- Demo banner -->
+  <div class="demo-banner" id="demoBanner">
+    <strong>DEMO</strong>
+    <span>Demonstrasjon med oppdiktede data. Ingen e-post sendes, ingen API-kall.</span>
+  </div>
+
+  <!-- ============================================================
+       OPPDRAG VIEW (default)
+       ============================================================ -->
+  <div class="oppdrag-view" id="oppdragView">
+
+  <!-- Filter tabs -->
+  <div class="tab-bar" id="tabBar">
+    <div class="tab active" data-filter="alle">Alle oppdrag <span class="count" id="countAlle">0</span></div>
+    <div class="tab" data-filter="Mottatt"><span class="tab-color" style="background:#ff9800"></span>Mottatt <span class="count" id="countMottatt">0</span></div>
+    <div class="tab" data-filter="Avtalt befaring"><span class="tab-color" style="background:#42a5f5"></span>Befaringer <span class="count" id="countAvtalt">0</span></div>
+    <div class="tab" data-filter="Befart"><span class="tab-color" style="background:#5c6bc0"></span>Befart <span class="count" id="countBefart">0</span></div>
+    <div class="tab" data-filter="arbeid"><span class="tab-color" style="background:#ab47bc"></span>Under arbeid <span class="count" id="countArbeid">0</span></div>
+    <div class="tab" data-filter="Kan faktureres"><span class="tab-color" style="background:#66bb6a"></span>Kan faktureres <span class="count" id="countFaktureres">0</span></div>
+    <div class="tab" data-filter="ferdig"><span class="tab-color" style="background:#43a047"></span>Ferdige <span class="count" id="countFerdig">0</span></div>
+  </div>
+
+  <!-- Stats strip -->
+  <div class="stats-strip" id="statsStrip">
+    <div class="stat-item"><span class="label">Totalt</span><span class="val" id="statTotal">-</span></div>
+    <div class="stat-item"><span class="label">Aktive</span><span class="val" id="statActive">-</span></div>
+    <div class="stat-item"><span class="label">Utestående</span><span class="val warn" id="statUtestaaende">-</span></div>
+    <div class="stat-item"><span class="label">Denne mnd</span><span class="val" id="statMaaned">-</span></div>
+    <div class="stat-item"><span class="label">I år</span><span class="val" id="statAar">-</span></div>
+    <div class="stat-item"><span class="label">Snittpris</span><span class="val" id="statSnitt">-</span></div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <input type="text" class="search-box" id="searchBox" placeholder="Raskt søk på adresse, oppdragsnr, megler, selger…" oninput="onSearch()">
+    <div class="toolbar-actions">
+      <button class="btn btn-outline" onclick="loadData()">Oppdater</button>
+    </div>
+  </div>
+
+  <!-- Oppdrag list -->
+  <div class="card-list" id="cardList">
+    <div class="loading"><div class="spinner"></div><br>Henter oppdrag…</div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination" style="display:none">
+    <span>Elementer per side</span>
+    <select id="pageSize" onchange="changePage(1)">
+      <option value="10">10</option>
+      <option value="25" selected>25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+    </select>
+    <span id="pageInfo">1 - 25 av 0</span>
+    <button class="page-btn" id="prevBtn" onclick="changePage(currentPage-1)">&lsaquo;</button>
+    <button class="page-btn" id="nextBtn" onclick="changePage(currentPage+1)">&rsaquo;</button>
+  </div>
+
+  </div><!-- /oppdrag-view -->
+
+  <!-- ============================================================
+       DASHBOARD VIEW (toggled via topnav)
+       ============================================================ -->
+  <div class="dashboard-view" id="dashboardView">
+    <div class="dash-section">
+      <h2>Nøkkeltall <span class="sub" id="dashTimestamp"></span></h2>
+      <div class="kpi-grid" id="dashKpis">Laster…</div>
+    </div>
+
+    <div class="dash-section">
+      <h2>Inntjening siste 12 måneder <span class="sub">(inkl. mva, hover for detaljer)</span></h2>
+      <div class="trend-chart" id="dashTrend">Laster…</div>
+    </div>
+
+    <div class="dash-section">
+      <h2>Fordeling per status</h2>
+      <div class="bar-list" id="dashStatusBars">Laster…</div>
+    </div>
+
+    <div class="dash-section">
+      <h2>Fordeling per oppdragstype <span class="sub">(antall, sortert etter omsetning)</span></h2>
+      <div class="bar-list" id="dashTypeBars">Laster…</div>
+    </div>
+
+    <div class="dash-section">
+      <h2>Fordeling per boligtype og størrelse</h2>
+      <div class="bar-list" id="dashBoligBars">Laster…</div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       ADMIN VIEW (toggled via topnav)
+       ============================================================ -->
+  <div class="admin-view" id="adminView">
+    <div class="admin-section">
+      <h2>Systemstatus</h2>
+      <div class="section-hint">Lese-modus-indikatorer. TEST_MODE, DEMO_MODE og WEBAPP_CRON_ENABLED styres via env-variabler i .env (krever restart for å endre).</div>
+      <div class="system-status" id="systemStatusChips">…</div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Bakgrunnsjobber</h2>
+      <div class="section-hint">Frekvens på automatiske jobber. Bruk node-cron-syntaks (eks. <code>*/15 * * * *</code>) eller velg en preset. Endringer trer i kraft umiddelbart. "Kjør nå" trigger jobben manuelt uavhengig av tidsplan.</div>
+      <div id="cronSection">Laster…</div>
+    </div>
+
+    <div class="admin-section">
+      <h2>E-postvarsler</h2>
+      <div class="section-hint">Skru av/på utgående e-post per type. Emne-felt støtter plassholdere: <code>{{adresse}}, {{oppdragsnr}}, {{befaringDato}}, {{ukenr}}, {{selger}}, {{oppdragstype}}</code>.</div>
+      <div id="emailEnableSection">Laster…</div>
+      <h3 style="font-size:14px;color:#1a5c2a;margin:20px 0 10px;border-top:1px solid #e8e8e8;padding-top:14px;">Emner</h3>
+      <div id="emailSubjectSection">Laster…</div>
+      <h3 style="font-size:14px;color:#1a5c2a;margin:20px 0 10px;border-top:1px solid #e8e8e8;padding-top:14px;">Innledninger og signatur</h3>
+      <div id="emailBodySection">Laster…</div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Reise og pris</h2>
+      <div class="section-hint">Disse styrer hvordan reisekost beregnes automatisk når et oppdrag opprettes eller adresse endres.</div>
+      <div id="travelSection">Laster…</div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Terskler</h2>
+      <div class="section-hint">Når påminnelser sendes for oppdrag som ligger lenge i "Mottatt".</div>
+      <div id="thresholdSection">Laster…</div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Mottakere</h2>
+      <div class="section-hint">Hvem som mottar systemets e-poster. Allowed-emails (whitelist for innlogging) settes via env-variabel ALLOWED_EMAILS i .env og kan ikke endres herfra.</div>
+      <div id="recipientsSection">Laster…</div>
+    </div>
+
+    <div class="activity-log">
+      <div class="log-header">
+        <h2>Aktivitetslogg</h2>
+        <span class="auto-refresh">Auto-refresh hvert 10. sekund · siste 50 hendelser</span>
+      </div>
+      <div class="log-list" id="activityList">
+        <div class="log-empty">Laster hendelser…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Intake form modal -->
+  <div class="modal-overlay" id="intakeModal" onclick="onIntakeBackdropClick(event)">
+    <div class="modal-panel" onclick="event.stopPropagation()" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="h-left">
+          <h2 style="margin:0;">Nytt oppdrag — manuell registrering</h2>
+        </div>
+        <button class="modal-close" onclick="closeIntake()" aria-label="Lukk">&times;</button>
+      </div>
+      <form class="intake-form" id="intakeForm" onsubmit="submitIntake(event)">
+        <div class="form-row">
+          <label for="i-adresse" class="required">Adresse</label>
+          <div>
+            <input type="text" id="i-adresse" name="adresse" required placeholder="Gatenavn nr, postnr poststed">
+            <div class="hint">F.eks. "Solbakken 12, 6010 Ålesund"</div>
+            <div class="field-error" id="err-adresse"></div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="i-selger">Selger</label>
+          <input type="text" id="i-selger" name="selger" placeholder="Navn på eier/selger">
+        </div>
+
+        <div class="form-row">
+          <label for="i-telefon">Telefon</label>
+          <input type="tel" id="i-telefon" name="telefon" placeholder="900 00 000">
+        </div>
+
+        <div class="form-row">
+          <label for="i-epost">E-post</label>
+          <input type="email" id="i-epost" name="epost" placeholder="selger@example.no">
+        </div>
+
+        <div class="form-row">
+          <label for="i-megler">Megler / oppdragsgiver</label>
+          <input type="text" id="i-megler" name="megler" placeholder="Megler-navn (firma)">
+        </div>
+
+        <div class="form-row">
+          <label for="i-boligtype">Boligtype</label>
+          <select id="i-boligtype" name="boligtype">
+            <option value=""></option>
+            <option value="Leilighet">Leilighet</option>
+            <option value="Rekkehus/leilighet 2-4-mannsbolig">Rekkehus/leilighet 2-4-mannsbolig</option>
+            <option value="Enebolig/fritidsbolig">Enebolig/fritidsbolig</option>
+            <option value="Frittstående bygg">Frittstående bygg</option>
+            <option value="Næringsbygg">Næringsbygg</option>
+            <option value="Annet">Annet</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="i-rapporttype">Rapporttype</label>
+          <select id="i-rapporttype" name="rapporttype">
+            <option value=""></option>
+            <option value="Tilstandsrapport">Tilstandsrapport</option>
+            <option value="Tilstandsrapport m/teknisk og markedsverdi">Tilstandsrapport m/teknisk og markedsverdi</option>
+            <option value="Skadetakstrapport">Skadetakst</option>
+            <option value="Reklamasjonsrapport">Reklamasjon</option>
+            <option value="Vurderingsrapport">Vurderingsoppdrag</option>
+            <option value="Overtagelsesrapport">Overtagelse</option>
+            <option value="Annen rapport">Annet</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="i-areal">Areal (m²)</label>
+          <input type="number" id="i-areal" name="areal" min="0" step="1" placeholder="80">
+        </div>
+
+        <div class="form-row">
+          <label for="i-merknad">Merknad</label>
+          <textarea id="i-merknad" name="merknad" placeholder="Tillegg, spesielle ønsker, kontekst…"></textarea>
+        </div>
+
+        <div class="modal-footer" style="margin: 24px -24px -24px;">
+          <div class="footer-info" id="intakeStatus"></div>
+          <button type="button" class="btn btn-outline" onclick="closeIntake()">Avbryt</button>
+          <button type="submit" class="btn btn-primary" id="intakeSubmit">Registrer oppdrag</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detail modal -->
+  <div class="modal-overlay" id="modal" onclick="onModalBackdropClick(event)">
+    <div class="modal-panel" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="h-left">
+          <span class="h-tag" id="modalStatusTag">…</span>
+          <h2 id="modalTitle">Henter…</h2>
+        </div>
+        <button class="modal-close" onclick="closeModal()" aria-label="Lukk">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="loading"><div class="spinner"></div><br>Henter detaljer…</div>
+      </div>
+      <div class="modal-footer" id="modalFooter" style="display:none">
+        <div class="footer-info" id="modalFooterInfo"></div>
+        <button class="btn btn-outline" onclick="closeModal()">Lukk</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allOppdrag = [];
+    let currentFilter = 'alle';
+    let currentPage = 1;
+    let searchQuery = '';
+    let currentUser = null;
+
+    // ── Data loading ──
+    async function loadData() {
+      try {
+        const res = await fetch('/api/dashboard-data');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+
+        allOppdrag = data.oppdrag || [];
+        renderStats(data);
+        updateTabCounts(data.statusCounts || {}, allOppdrag);
+        renderCards();
+
+        const ml = document.getElementById('modeLabel');
+        if (data.demoMode) {
+          ml.textContent = 'DEMO';
+          ml.className = 'mode-badge demo';
+          document.getElementById('demoBanner').classList.add('on');
+        } else if (data.testMode) {
+          ml.textContent = 'TESTMODUS';
+          ml.className = 'mode-badge test';
+        } else {
+          ml.textContent = 'Produksjon';
+          ml.className = 'mode-badge prod';
+        }
+      } catch (e) {
+        document.getElementById('cardList').innerHTML = `<div class="empty">Kunne ikke hente data: ${e.message}</div>`;
+        showToast('Feil ved henting: ' + e.message, 'error');
+      }
+    }
+
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch('/api/me');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        currentUser = data.user;
+        const chip = document.getElementById('userEmail');
+        const wrap = document.getElementById('userChip');
+        if (currentUser) {
+          chip.textContent = currentUser.email;
+          wrap.title = currentUser.name || currentUser.email;
+        }
+      } catch (e) {
+        console.error('me error', e);
+      }
+    }
+
+    function fmt(n) { return n != null && n > 0 ? Number(n).toLocaleString('nb-NO') + ' kr' : '-'; }
+
+    function renderStats(data) {
+      document.getElementById('statTotal').textContent = data.total || 0;
+      document.getElementById('statActive').textContent = data.active || 0;
+      document.getElementById('statUtestaaende').textContent = fmt(data.utestaendeInkl);
+      document.getElementById('statMaaned').textContent = fmt(data.omsMaaned);
+      document.getElementById('statAar').textContent = fmt(data.omsAar);
+      document.getElementById('statSnitt').textContent = fmt(data.snittPrisInkl);
+    }
+
+    function updateTabCounts(counts, oppdrag) {
+      const c = counts || {};
+      document.getElementById('countAlle').textContent = oppdrag.length;
+      document.getElementById('countMottatt').textContent = c['Mottatt'] || 0;
+      document.getElementById('countAvtalt').textContent = c['Avtalt befaring'] || 0;
+      document.getElementById('countBefart').textContent = c['Befart'] || 0;
+      document.getElementById('countArbeid').textContent = (c['Utkast'] || 0) + (c['Endelig rapport'] || 0);
+      document.getElementById('countFaktureres').textContent = c['Kan faktureres'] || 0;
+      document.getElementById('countFerdig').textContent = (c['Fakturert'] || 0) + (c['Oppdrag fullført'] || 0);
+    }
+
+    // ── Filtering ──
+    function getFiltered() {
+      let list = allOppdrag;
+      if (currentFilter === 'arbeid') {
+        list = list.filter(o => o.status === 'Utkast' || o.status === 'Endelig rapport');
+      } else if (currentFilter === 'ferdig') {
+        list = list.filter(o => o.status === 'Fakturert' || o.status === 'Oppdrag fullført');
+      } else if (currentFilter !== 'alle') {
+        list = list.filter(o => o.status === currentFilter);
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(o =>
+          (o.adresse || '').toLowerCase().includes(q) ||
+          (o.oppdragsnr || '').toLowerCase().includes(q) ||
+          (o.megler || '').toLowerCase().includes(q) ||
+          (o.selger || '').toLowerCase().includes(q) ||
+          (o.oppdragstype || '').toLowerCase().includes(q)
+        );
+      }
+      return list;
+    }
+
+    function onSearch() {
+      searchQuery = document.getElementById('searchBox').value;
+      currentPage = 1;
+      renderCards();
+    }
+
+    // ── Tab click ──
+    document.getElementById('tabBar').addEventListener('click', e => {
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentFilter = tab.dataset.filter;
+      currentPage = 1;
+      renderCards();
+    });
+
+    // ── Rendering ──
+    function cleanAddress(addr) {
+      if (!addr) return { text: '', url: '' };
+      const m = String(addr).match(/=HYPERLINK\("([^"]+)","([^"]+)"\)/);
+      if (m) return { url: m[1], text: m[2].replace(/""/g, '"') };
+      return { text: addr, url: '' };
+    }
+
+    function tagClass(status) {
+      const map = {
+        'Mottatt': 'tag-mottatt', 'Avtalt befaring': 'tag-avtalt', 'Befart': 'tag-befart',
+        'Utkast': 'tag-utkast', 'Endelig rapport': 'tag-endelig',
+        'Kan faktureres': 'tag-faktureres', 'Fakturert': 'tag-fakturert',
+        'Oppdrag fullført': 'tag-fullfort', 'Oppdrag kansellert': 'tag-kansellert'
+      };
+      return map[status] || 'tag-mottatt';
+    }
+
+    function houseIcon(type) {
+      const t = (type || '').toLowerCase();
+      if (t.includes('skade')) return '🔧';
+      if (t.includes('reklamasjon')) return '⚠️';
+      if (t.includes('vurdering') || t.includes('verdi')) return '💰';
+      if (t.includes('overtagelse')) return '🤝';
+      return '🏠';
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function renderCards() {
+      const container = document.getElementById('cardList');
+      const filtered = getFiltered();
+      const pageSize = parseInt(document.getElementById('pageSize').value);
+      const start = (currentPage - 1) * pageSize;
+      const page = filtered.slice(start, start + pageSize);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty">Ingen oppdrag funnet</div>';
+        document.getElementById('pagination').style.display = 'none';
+        return;
+      }
+
+      let html = '';
+      for (const o of page) {
+        const addr = cleanAddress(o.adresse);
+        const addrHtml = addr.url
+          ? `<a href="${escapeHtml(addr.url)}" target="_blank" rel="noopener">${escapeHtml(addr.text)}</a>`
+          : escapeHtml(addr.text);
+
+        html += `
+        <div class="oppdrag-card" data-row="${o.rowNum}">
+          <div class="card-icon">${houseIcon(o.oppdragstype)}</div>
+          <div class="card-main">
+            <div class="card-address"><span class="card-pin">&#x1F4CD;</span> ${addrHtml}</div>
+            <div class="card-meta">
+              <span class="card-tag ${tagClass(o.status)}">${escapeHtml(o.status)}</span>
+              <span class="card-tag tag-type">${escapeHtml(o.oppdragstype)}</span>
+              ${o.oppdragsnr ? `<span style="font-size:12px;color:#999">${escapeHtml(o.oppdragsnr)}</span>` : ''}
+            </div>
+            <div class="card-dates">Opprettet: ${escapeHtml(o.datoMottatt || '-')}</div>
+          </div>
+          <div class="card-info">
+            <span class="name">${escapeHtml(o.selger || o.megler || '-')}</span>
+            <span class="phone">${escapeHtml(o.selgerTlf || '')}</span>
+          </div>
+          <div class="card-price">
+            <div class="amount">${fmt(o.prisInkl)}</div>
+            ${o.reiseInkl ? `<div class="sub">+ ${fmt(o.reiseInkl)} reise</div>` : ''}
+          </div>
+        </div>`;
+      }
+      container.innerHTML = html;
+
+      // Pagination
+      const pag = document.getElementById('pagination');
+      pag.style.display = 'flex';
+      document.getElementById('pageInfo').textContent = `${start + 1} - ${Math.min(start + pageSize, filtered.length)} av ${filtered.length}`;
+      document.getElementById('prevBtn').disabled = currentPage <= 1;
+      document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+    }
+
+    function changePage(p) {
+      const filtered = getFiltered();
+      const pageSize = parseInt(document.getElementById('pageSize').value);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      currentPage = Math.max(1, Math.min(p, totalPages));
+      renderCards();
+    }
+
+    // ── Detail modal ──
+    document.getElementById('cardList').addEventListener('click', e => {
+      const card = e.target.closest('.oppdrag-card');
+      if (!card) return;
+      // Don't intercept clicks on the address link
+      if (e.target.closest('.card-address a')) return;
+      const rowNum = parseInt(card.dataset.row, 10);
+      if (rowNum) openModal(rowNum);
+    });
+
+    function onModalBackdropClick(e) {
+      if (e.target.id === 'modal') closeModal();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('modal').classList.contains('on')) {
+        closeModal();
+      }
+    });
+
+    async function openModal(rowNum) {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const tag = document.getElementById('modalStatusTag');
+      const title = document.getElementById('modalTitle');
+      const footer = document.getElementById('modalFooter');
+      const footerInfo = document.getElementById('modalFooterInfo');
+
+      tag.textContent = '…';
+      tag.className = 'h-tag';
+      title.textContent = 'Henter…';
+      body.innerHTML = '<div class="loading"><div class="spinner"></div><br>Henter detaljer…</div>';
+      footer.style.display = 'none';
+      modal.classList.add('on');
+      document.body.style.overflow = 'hidden';
+
+      try {
+        const res = await fetch(`/api/oppdrag/${rowNum}`);
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        renderDetail(data.oppdrag);
+      } catch (e) {
+        body.innerHTML = `<div class="empty">Kunne ikke hente detaljer: ${escapeHtml(e.message)}</div>`;
+        title.textContent = 'Feil';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('on');
+      document.body.style.overflow = '';
+    }
+
+    function field(label, value, opts = {}) {
+      const isEmpty = value === null || value === undefined || value === '' || value === '-';
+      const cls = ['value', opts.cls || ''].filter(Boolean).join(' ') + (isEmpty ? ' muted' : '');
+      const display = isEmpty ? '—' : (opts.html ? value : escapeHtml(String(value)));
+      return `<div class="field"><span class="label">${escapeHtml(label)}</span><span class="${cls}">${display}</span></div>`;
+    }
+
+    // Dropdown options sourced from Apps Script v3.1 NaavaTakst.gs
+    const DROPDOWNS = {
+      boligtype: ['Leilighet', 'Rekkehus/leilighet 2-4-mannsbolig', 'Enebolig/fritidsbolig', 'Frittstående bygg', 'Næringsbygg', 'Annet'],
+      rapporttype: ['Tilstandsrapport m/teknisk og markedsverdi', 'Tilstandsrapport', 'Skadetakstrapport', 'Reklamasjonsrapport', 'Vurderingsrapport', 'Overtagelsesrapport', 'Annen rapport'],
+    };
+
+    // Editable field — type can be 'text', 'number', 'select', 'textarea', 'checkbox', 'tel', 'email', 'date', 'time'
+    function editField(label, fieldName, value, opts = {}) {
+      const type = opts.type || 'text';
+      const id = `f_${fieldName}_${Math.random().toString(36).slice(2,7)}`;
+      const v = value == null ? '' : value;
+
+      let input;
+      if (type === 'select') {
+        const options = opts.options || [];
+        const opts_html = ['<option value=""></option>'].concat(
+          options.map(o => `<option value="${escapeHtml(o)}"${String(o) === String(v) ? ' selected' : ''}>${escapeHtml(o)}</option>`)
+        ).join('');
+        input = `<select id="${id}" data-field="${fieldName}">${opts_html}</select>`;
+      } else if (type === 'textarea') {
+        input = `<textarea id="${id}" data-field="${fieldName}" rows="3">${escapeHtml(v)}</textarea>`;
+      } else if (type === 'checkbox') {
+        const checked = (v === true || v === 'TRUE' || v === 'true') ? ' checked' : '';
+        return `<div class="field"><span class="label">${escapeHtml(label)}</span>
+          <div class="field-checkbox">
+            <input type="checkbox" id="${id}" data-field="${fieldName}"${checked}>
+            <label for="${id}" style="font-size:14px;color:#222;cursor:pointer;">${opts.checkboxLabel || 'På'}</label>
+          </div>
+          <div class="save-indicator" data-indicator-for="${fieldName}"></div>
+        </div>`;
+      } else {
+        const inputType = type;
+        input = `<input type="${inputType}" id="${id}" data-field="${fieldName}" value="${escapeHtml(v)}"${opts.placeholder ? ` placeholder="${escapeHtml(opts.placeholder)}"` : ''}>`;
+      }
+      return `<div class="field"><span class="label">${escapeHtml(label)}</span>${input}<div class="save-indicator" data-indicator-for="${fieldName}"></div></div>`;
+    }
+
+    // Debounced save tracker per field
+    const _saveTimers = {};
+    function bindEditableInputs(rowNum) {
+      const modal = document.getElementById('modal');
+      modal.querySelectorAll('[data-field]').forEach(el => {
+        const fieldName = el.dataset.field;
+        const isText = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number' || el.type === 'tel' || el.type === 'email' || el.type === 'date' || el.type === 'time') || el.tagName === 'TEXTAREA';
+        if (el.tagName === 'SELECT' || el.type === 'checkbox') {
+          el.addEventListener('change', () => {
+            const value = el.type === 'checkbox' ? el.checked : el.value;
+            saveField(rowNum, fieldName, value);
+          });
+        } else if (isText) {
+          // Debounced save on input, immediate save on blur
+          el.addEventListener('input', () => {
+            clearTimeout(_saveTimers[fieldName]);
+            setIndicator(fieldName, 'saving', '');
+            _saveTimers[fieldName] = setTimeout(() => saveField(rowNum, fieldName, el.value), 800);
+          });
+          el.addEventListener('blur', () => {
+            if (_saveTimers[fieldName]) {
+              clearTimeout(_saveTimers[fieldName]);
+              saveField(rowNum, fieldName, el.value);
+            }
+          });
+        }
+      });
+    }
+
+    function setIndicator(fieldName, state, text) {
+      const el = document.querySelector(`[data-indicator-for="${fieldName}"]`);
+      if (!el) return;
+      el.className = 'save-indicator ' + (state || '');
+      el.textContent = text;
+    }
+
+    async function saveField(rowNum, fieldName, value) {
+      setIndicator(fieldName, 'saving', 'Lagrer…');
+      try {
+        const res = await fetch(`/api/oppdrag/${rowNum}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [fieldName]: value }),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        if (data.demoMode) {
+          setIndicator(fieldName, 'saved', 'Demo: simulert');
+        } else {
+          setIndicator(fieldName, 'saved', '✓ Lagret');
+          // If side effects fired (pricing/travel/befaring), refresh the modal so computed fields update
+          if (data.touched && (data.touched.pricing || data.touched.travel || data.touched.befaring)) {
+            // Soft-refresh: re-render with the latest oppdrag data
+            if (data.oppdrag) renderDetail(data.oppdrag);
+            // Also refresh the underlying list
+            loadData();
+          }
+        }
+        setTimeout(() => setIndicator(fieldName, '', ''), 2500);
+      } catch (e) {
+        console.error('saveField error:', e);
+        setIndicator(fieldName, 'error', 'Feil: ' + e.message);
+      }
+    }
+
+    async function changeStatus(rowNum, newStatus) {
+      try {
+        const res = await fetch(`/api/oppdrag/${rowNum}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        showToast(`Status: ${newStatus}` + (data.demoMode ? ' (demo)' : ''), 'success');
+        if (data.oppdrag) renderDetail(data.oppdrag);
+        loadData();
+      } catch (e) {
+        showToast('Kunne ikke endre status: ' + e.message, 'error');
+      }
+    }
+
+    function renderDetail(o) {
+      const tag = document.getElementById('modalStatusTag');
+      const title = document.getElementById('modalTitle');
+      const body = document.getElementById('modalBody');
+      const footer = document.getElementById('modalFooter');
+      const footerInfo = document.getElementById('modalFooterInfo');
+
+      const addr = cleanAddress(o.adresse);
+      const addrLink = addr.url
+        ? `<a href="${escapeHtml(addr.url)}" target="_blank" rel="noopener">${escapeHtml(addr.text)} 📂</a>`
+        : escapeHtml(addr.text);
+
+      tag.textContent = o.status || '—';
+      tag.className = 'h-tag';
+      title.textContent = `${o.oppdragsnr || ''} — ${addr.text || ''}`;
+
+      const folderLink = o.linkMappe
+        ? `<a href="${escapeHtml(o.linkMappe)}" target="_blank" rel="noopener">Åpne mappe ↗</a>`
+        : null;
+
+      const sections = [];
+
+      // Identifikasjon (read-only)
+      sections.push(`<div class="modal-section"><h3>Identifikasjon</h3><div class="field-grid">
+        ${field('Oppdragsnr', o.oppdragsnr)}
+        ${field('Status', o.status)}
+        ${field('Kilde', o.kilde)}
+        ${field('Dato mottatt', o.datoMottatt)}
+        ${field('Oppdragstype', o.oppdragstype)}
+        ${editField('Rapporttype', 'rapporttype', o.rapporttype, { type: 'select', options: DROPDOWNS.rapporttype })}
+      </div></div>`);
+
+      // Eiendom + bygg
+      sections.push(`<div class="modal-section"><h3>Eiendom</h3><div class="field-grid">
+        ${field('Adresse', addrLink, { html: true })}
+        ${editField('Boligtype', 'boligtype', o.boligtype, { type: 'select', options: DROPDOWNS.boligtype })}
+        ${editField('Areal (m²)', 'areal', o.areal, { type: 'number' })}
+        ${editField('Antall tilleggsbygg', 'antallTilleggsbygg', o.antallTilleggsbygg, { type: 'number' })}
+        ${editField('Med markedsverdi', 'medMarkedsverdi', o.medMarkedsverdi, { type: 'checkbox', checkboxLabel: 'Inkluder markedsverdi' })}
+        ${field('Mappe', folderLink || '—', { html: true })}
+      </div></div>`);
+
+      // Selger
+      sections.push(`<div class="modal-section"><h3>Selger</h3><div class="field-grid">
+        ${editField('Navn', 'selger', o.selger)}
+        ${editField('Telefon', 'selgerTlf', o.selgerTlf, { type: 'tel' })}
+        ${editField('E-post', 'selgerEpost', o.selgerEpost, { type: 'email' })}
+      </div></div>`);
+
+      // Megler / oppdragsgiver
+      sections.push(`<div class="modal-section"><h3>Megler / oppdragsgiver</h3><div class="field-grid">
+        ${editField('Megler', 'megler', o.megler)}
+        ${editField('Megler e-post', 'meglerEpost', o.meglerEpost, { type: 'email' })}
+        ${field('Oppdragsgiver', o.oppdragsgiver)}
+        ${editField('Faktura ref', 'fakturaRef', o.fakturaRef)}
+        ${editField('Faktura sendes til', 'fakturaSendesTil', o.fakturaSendesTil)}
+        ${editField('Fakturamotaker', 'fakturamotaker', o.fakturamotaker)}
+      </div></div>`);
+
+      // Befaring (editable)
+      sections.push(`<div class="modal-section"><h3>Befaring</h3><div class="field-grid">
+        ${editField('Dato (dd.mm.yyyy)', 'befaringDato', o.befaringDato, { placeholder: 'dd.mm.yyyy' })}
+        ${editField('Klokkeslett (hh:mm)', 'befaringKl', o.befaringKl, { placeholder: 'hh:mm' })}
+      </div></div>`);
+
+      // Pris (read-only — autocalculated)
+      sections.push(`<div class="modal-section"><h3>Pris <span style="font-size:11px;color:#999;font-weight:normal">(beregnes automatisk)</span></h3><div class="field-grid">
+        ${field('Pris inkl. mva', fmt(o.prisInkl), { cls: 'price-big' })}
+        ${field('Pris eks. mva', fmt(o.prisEks))}
+        ${field('MVA', fmt(o.mvaBelop))}
+        ${field('Produktnummer', o.produktnummer)}
+        ${editField('Timer', 'timer', o.timer)}
+      </div></div>`);
+
+      // Reise
+      sections.push(`<div class="modal-section"><h3>Reise</h3><div class="field-grid">
+        ${field('Avstand t/r', o.avstandKm ? String(o.avstandKm).replace(/\s*km\s*$/i, '') + ' km' : '')}
+        ${field('Reise eks. mva', fmt(o.reiseEks))}
+        ${field('Reise inkl. mva', fmt(o.reiseInkl))}
+        ${editField('Ferge / bom', 'sumFergeBom', o.sumFergeBom, { type: 'number' })}
+        ${editField('Antall som deler reise', 'antallDeleReise', o.antallDeleReise, { type: 'number' })}
+      </div></div>`);
+
+      // Status / flags
+      sections.push(`<div class="modal-section"><h3>Status og merker</h3><div class="field-grid">
+        ${editField('Kan faktureres', 'kanFaktureres', o.kanFaktureres, { type: 'checkbox', checkboxLabel: 'Klar til fakturering' })}
+        ${field('Kansellert', o.kansellert ? '✅ Ja' : 'Nei')}
+        ${editField('Scan IVIT', 'scanIvit', o.scanIvit, { type: 'checkbox', checkboxLabel: 'Hent fra IVIT ved neste kjøring' })}
+        ${field('Dato statusendring', o.datoStatusendring)}
+      </div></div>`);
+
+      // Notater + kommentar regnskap (editable)
+      sections.push(`<div class="modal-section"><h3>Notater</h3><div class="field-grid cols-1">
+        ${editField('Notater', 'notater', o.notater, { type: 'textarea' })}
+        ${editField('Kommentar til regnskap (vises i fakturamail)', 'kommentarRegnskap', o.kommentarRegnskap, { type: 'textarea' })}
+      </div></div>`);
+
+      body.innerHTML = sections.join('');
+      bindEditableInputs(o.rowNum);
+
+      // Status change buttons in footer
+      const statusButtons = [
+        { label: 'Avtalt befaring', cls: 'status-btn-avtalt' },
+        { label: 'Befart', cls: 'status-btn-befart' },
+        { label: 'Utkast', cls: 'status-btn-mottatt' },
+        { label: 'Endelig rapport', cls: 'status-btn-avtalt' },
+        { label: 'Kan faktureres', cls: 'status-btn-faktureres' },
+        { label: 'Oppdrag fullført', cls: 'status-btn-faktureres' },
+        { label: 'Oppdrag kansellert', cls: 'status-btn-kansellert' },
+      ].filter(s => s.label !== o.status); // hide current status
+
+      const footerLeft = `<div class="status-actions">
+        ${statusButtons.map(s => `<button class="btn ${s.cls}" onclick="changeStatus(${o.rowNum}, '${escapeHtml(s.label)}')">${escapeHtml(s.label)}</button>`).join('')}
+      </div>`;
+
+      footer.innerHTML = `${footerLeft}<button class="btn btn-outline" onclick="closeModal()">Lukk</button>`;
+      footer.style.display = 'flex';
+    }
+
+    // ── Views ──
+    function setView(v) {
+      document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+      const oppdragView = document.getElementById('oppdragView');
+      const adminView = document.getElementById('adminView');
+
+      if (v === 'ny') {
+        openIntake();
+        setTimeout(() => {
+          document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'oppdrag'));
+        }, 100);
+      } else if (v === 'admin') {
+        oppdragView.style.display = 'none';
+        adminView.classList.add('on');
+        document.getElementById('demoBanner').style.display = 'none';
+        loadAdmin();
+        startAdminAutoRefresh();
+      } else if (v === 'oppdrag') {
+        oppdragView.style.display = '';
+        adminView.classList.remove('on');
+        // Restore demo banner if active
+        if (currentDemoMode) document.getElementById('demoBanner').style.display = 'flex';
+        stopAdminAutoRefresh();
+      } else if (v === 'dashboard') {
+        oppdragView.style.display = 'none';
+        adminView.classList.remove('on');
+        document.getElementById('dashboardView').classList.add('on');
+        document.getElementById('demoBanner').style.display = 'none';
+        loadDashboard();
+        stopAdminAutoRefresh();
+      }
+
+      // When leaving dashboard, hide it
+      if (v !== 'dashboard') {
+        document.getElementById('dashboardView').classList.remove('on');
+      }
+    }
+
+    // ── Dashboard view ──
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/dashboard-stats');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        renderDashboard(data.stats);
+      } catch (e) {
+        document.getElementById('dashKpis').innerHTML = `<div class="empty-row">Kunne ikke laste statistikk: ${escapeHtml(e.message)}</div>`;
+        showToast('Dashboard-feil: ' + e.message, 'error');
+      }
+    }
+
+    function renderDashboard(s) {
+      // Timestamp
+      const ts = s.timestamp ? new Date(s.timestamp).toLocaleString('nb-NO') : '';
+      document.getElementById('dashTimestamp').textContent = ts ? `(${ts})` : '';
+
+      // KPI cards
+      const kpis = [
+        { label: 'Totalt oppdrag', value: s.total || 0, cls: 'highlight' },
+        { label: 'Aktive', value: s.active || 0, sub: 'Ikke ferdig/kansellert' },
+        { label: 'Omsetning i år', value: fmt(s.omsÅr), sub: 'Alle ikke-kansellerte' },
+        { label: 'Denne måneden', value: fmt(s.omsMåned), cls: 'highlight' },
+        { label: 'Snittpris', value: fmt(s.snittPrisInkl), sub: `${s.snittAntall || 0} oppdrag` },
+        { label: 'Utestående', value: fmt(s.uteståendeInkl), sub: 'Kan faktureres', cls: s.uteståendeInkl > 0 ? 'warn' : '' },
+        { label: 'Fakturert i år', value: fmt(s.fakturertÅr), sub: `${s.countFakturert || 0} fakturerte` },
+        { label: 'Reisekost i år', value: fmt(s.reiseÅr) },
+      ];
+      document.getElementById('dashKpis').innerHTML = kpis.map(k => `
+        <div class="kpi-card ${k.cls || ''}">
+          <div class="kpi-label">${escapeHtml(k.label)}</div>
+          <div class="kpi-value">${escapeHtml(String(k.value))}</div>
+          ${k.sub ? `<div class="kpi-sub">${escapeHtml(k.sub)}</div>` : ''}
+        </div>
+      `).join('');
+
+      // Trend chart (12 months)
+      const months = s.trendMonths || [];
+      const maxVal = Math.max(1, ...months.map(m => m.omsInkl + m.reiseInkl));
+      document.getElementById('dashTrend').innerHTML = months.map(m => {
+        const total = m.omsInkl + m.reiseInkl;
+        const pct = (total / maxVal) * 100;
+        const isZero = total === 0;
+        return `<div class="trend-col">
+          <div class="trend-value">${total > 0 ? Math.round(total / 1000) + 'k' : ''}</div>
+          <div class="trend-bar-wrap">
+            <div class="trend-bar ${isZero ? 'trend-zero' : ''}" style="height: ${pct}%;">
+              <div class="trend-tooltip">${escapeHtml(m.label)}: ${fmt(total)} (${m.count || 0} oppdrag)</div>
+            </div>
+          </div>
+          <div class="trend-label">${escapeHtml(m.label)}</div>
+        </div>`;
+      }).join('');
+
+      // Status bars
+      const statusOrder = ['Mottatt', 'Avtalt befaring', 'Befart', 'Utkast', 'Endelig rapport', 'Kan faktureres', 'Fakturert', 'Oppdrag fullført', 'Oppdrag kansellert'];
+      const statusColors = {
+        'Mottatt': '#ff9800', 'Avtalt befaring': '#42a5f5', 'Befart': '#5c6bc0',
+        'Utkast': '#c62828', 'Endelig rapport': '#6a1b9a', 'Kan faktureres': '#66bb6a',
+        'Fakturert': '#43a047', 'Oppdrag fullført': '#1a5c2a', 'Oppdrag kansellert': '#9e9e9e',
+      };
+      const statusMax = Math.max(1, ...statusOrder.map(st => s.byStatus[st] || 0));
+      document.getElementById('dashStatusBars').innerHTML = statusOrder.map(st => {
+        const v = s.byStatus[st] || 0;
+        const pct = (v / statusMax) * 100;
+        return `<div class="bar-row">
+          <div class="bar-label"><span class="swatch" style="background:${statusColors[st]}"></span>${escapeHtml(st)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:linear-gradient(90deg, ${statusColors[st]}cc, ${statusColors[st]})"></div></div>
+          <div class="bar-value">${v}</div>
+        </div>`;
+      }).join('');
+
+      // Type bars — sorted by omsetning (or count if no oms)
+      const typeKeys = Object.keys(s.byType || {});
+      typeKeys.sort((a, b) => (s.byTypeOms?.[b] || 0) - (s.byTypeOms?.[a] || 0) || (s.byType[b] - s.byType[a]));
+      const typeMax = Math.max(1, ...typeKeys.map(t => s.byType[t] || 0));
+      document.getElementById('dashTypeBars').innerHTML = typeKeys.length === 0
+        ? '<div class="empty-row">Ingen data.</div>'
+        : typeKeys.map(t => {
+          const cnt = s.byType[t] || 0;
+          const oms = s.byTypeOms?.[t] || 0;
+          const pct = (cnt / typeMax) * 100;
+          return `<div class="bar-row">
+            <div class="bar-label">${escapeHtml(t)}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+            <div class="bar-value">${cnt}${oms > 0 ? `<div style="font-size:11px;color:#999;font-weight:normal">${fmt(oms)}</div>` : ''}</div>
+          </div>`;
+        }).join('');
+
+      // Bolig bucket bars
+      const boligKeys = Object.keys(s.byBoligBucket || {}).sort();
+      const boligMax = Math.max(1, ...boligKeys.map(b => s.byBoligBucket[b] || 0));
+      document.getElementById('dashBoligBars').innerHTML = boligKeys.length === 0
+        ? '<div class="empty-row">Ingen data.</div>'
+        : boligKeys.map(b => {
+          const v = s.byBoligBucket[b] || 0;
+          const pct = (v / boligMax) * 100;
+          return `<div class="bar-row">
+            <div class="bar-label">${escapeHtml(b)}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+            <div class="bar-value">${v}</div>
+          </div>`;
+        }).join('');
+    }
+
+    // ── Admin view ──
+    let currentDemoMode = false;
+    let _adminRefresh = null;
+
+    async function loadAdmin() {
+      await Promise.all([loadSettings(), loadActivity(), loadJobs(), loadSystemStatus()]);
+    }
+
+    function startAdminAutoRefresh() {
+      stopAdminAutoRefresh();
+      _adminRefresh = setInterval(loadActivity, 10000);
+    }
+    function stopAdminAutoRefresh() {
+      if (_adminRefresh) clearInterval(_adminRefresh);
+      _adminRefresh = null;
+    }
+
+    async function loadSystemStatus() {
+      try {
+        const meRes = await fetch('/api/me');
+        const me = await meRes.json();
+        currentDemoMode = !!me.demoMode;
+        const chips = [];
+        chips.push(me.demoMode ? '<span class="chip demo">DEMO_MODE: PÅ</span>'
+                               : '<span class="chip prod">DEMO_MODE: AV</span>');
+        chips.push(me.testMode ? '<span class="chip test">TEST_MODE: PÅ</span>'
+                               : '<span class="chip prod">TEST_MODE: AV</span>');
+        chips.push(me.webappCronEnabled ? '<span class="chip on">WEBAPP_CRON: PÅ</span>'
+                                        : '<span class="chip off">WEBAPP_CRON: AV</span>');
+        if (me.user) chips.push(`<span class="chip off">Innlogget: ${escapeHtml(me.user.email)}</span>`);
+        document.getElementById('systemStatusChips').innerHTML = chips.join('');
+      } catch (e) {
+        document.getElementById('systemStatusChips').textContent = 'Kunne ikke laste status.';
+      }
+    }
+
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        renderSettings(data.settings, data.schema);
+      } catch (e) {
+        showToast('Kunne ikke laste innstillinger: ' + e.message, 'error');
+      }
+    }
+
+    const CRON_PRESETS = [
+      { label: 'Hvert 5. min',  expr: '*/5 * * * *' },
+      { label: 'Hvert 15. min', expr: '*/15 * * * *' },
+      { label: 'Hver halvtime', expr: '*/30 * * * *' },
+      { label: 'Hver time',     expr: '0 * * * *' },
+      { label: 'Hver 4. time',  expr: '0 */4 * * *' },
+      { label: 'Daglig 08:00',  expr: '0 8 * * *' },
+      { label: 'Fredag 16:00',  expr: '0 16 * * 5' },
+      { label: 'Mandag 09:00',  expr: '0 9 * * 1' },
+    ];
+
+    function adminRow(key, label, sub, control, extra = '') {
+      return `<div class="admin-row" data-key="${key}">
+        <div class="label">${escapeHtml(label)}${sub ? `<span class="sub">${escapeHtml(sub)}</span>` : ''}</div>
+        <div class="value-cell">${control}</div>
+        <div class="indicator" data-indicator-for-key="${key}">${extra}</div>
+      </div>`;
+    }
+
+    function adminFullRow(key, label, sub, control) {
+      return `<div class="admin-row full" data-key="${key}">
+        <div class="label">${escapeHtml(label)}${sub ? `<span class="sub">${escapeHtml(sub)}</span>` : ''}</div>
+        ${control}
+        <div class="indicator" data-indicator-for-key="${key}" style="text-align:right">&nbsp;</div>
+      </div>`;
+    }
+
+    function renderSettings(s, schema) {
+      // --- Cron section ---
+      const cronKeys = ['cron.scanEmails', 'cron.processIvit', 'cron.checkReminders', 'cron.updateDashboard', 'cron.weeklyReport'];
+      const jobNameMap = {
+        'cron.scanEmails':       'scanEmails',
+        'cron.processIvit':      'processIvit',
+        'cron.checkReminders':   'checkReminders',
+        'cron.updateDashboard':  'updateDashboard',
+        'cron.weeklyReport':     'weeklyReport',
+      };
+      let cronHtml = '';
+      for (const key of cronKeys) {
+        const sp = schema[key] || {};
+        const presetChips = CRON_PRESETS.map(p =>
+          `<span class="cron-preset" onclick="setSettingValue('${key}', '${p.expr}')">${escapeHtml(p.label)}</span>`
+        ).join('');
+        const control = `
+          <input type="text" data-setting="${key}" value="${escapeHtml(s[key] || '')}" placeholder="*/5 * * * *">
+          <button class="btn btn-outline" onclick="runJobManually('${jobNameMap[key]}')">Kjør nå</button>
+        `;
+        const ctrlPlusPresets = `${control}</div><div class="cron-presets" style="grid-column: 2 / 4; margin-top: 4px;">${presetChips}`;
+        cronHtml += adminRow(key, sp.label || key, '', ctrlPlusPresets);
+      }
+      document.getElementById('cronSection').innerHTML = cronHtml;
+
+      // --- Email enables ---
+      const enableKeys = ['email.sendFakturaToAccountant', 'email.sendBefaringConfirmation', 'email.sendNewOppdragNotification', 'email.sendUrgentReminder'];
+      let enableHtml = '';
+      for (const key of enableKeys) {
+        const sp = schema[key] || {};
+        const checked = s[key] ? ' checked' : '';
+        const ctrl = `<label class="switch"><input type="checkbox" data-setting="${key}"${checked}><span class="slider"></span></label><span class="switch-label">${s[key] ? 'På' : 'Av'}</span>`;
+        enableHtml += adminRow(key, sp.label || key, '', ctrl);
+      }
+      document.getElementById('emailEnableSection').innerHTML = enableHtml;
+
+      // --- Email subjects ---
+      const subjectKeys = ['email.fakturaSubject', 'email.befaringSubject', 'email.nyttOppdragSubject', 'email.ukerapportSubject', 'email.urgentReminderSubject'];
+      let subjectHtml = '';
+      for (const key of subjectKeys) {
+        const sp = schema[key] || {};
+        const ctrl = `<input type="text" data-setting="${key}" value="${escapeHtml(s[key] || '')}">`;
+        subjectHtml += adminRow(key, sp.label || key, '', ctrl);
+      }
+      document.getElementById('emailSubjectSection').innerHTML = subjectHtml;
+
+      // --- Email bodies (textareas) ---
+      const bodyKeys = ['email.befaringIntro', 'email.nyttOppdragIntro', 'email.urgentReminderBody', 'email.signatureHtml'];
+      let bodyHtml = '';
+      for (const key of bodyKeys) {
+        const sp = schema[key] || {};
+        const sub = key === 'email.signatureHtml' ? 'HTML tillates. Brukes i kunde-eposter.' : 'Vanlig tekst. Vises som introduksjon i e-posten.';
+        const ctrl = `<textarea data-setting="${key}">${escapeHtml(s[key] || '')}</textarea>`;
+        bodyHtml += adminFullRow(key, sp.label || key, sub, ctrl);
+      }
+      document.getElementById('emailBodySection').innerHTML = bodyHtml;
+
+      // --- Travel/pris ---
+      const travelKeys = ['travel.baseAddress', 'travel.satsKr', 'travel.inkludertKm', 'mva.rate'];
+      let travelHtml = '';
+      for (const key of travelKeys) {
+        const sp = schema[key] || {};
+        const type = sp.type === 'number' ? 'number' : 'text';
+        const step = key === 'mva.rate' ? ' step="0.01"' : '';
+        const ctrl = `<input type="${type}" data-setting="${key}" value="${escapeHtml(s[key] != null ? s[key] : '')}"${step}>`;
+        travelHtml += adminRow(key, sp.label || key, '', ctrl);
+      }
+      document.getElementById('travelSection').innerHTML = travelHtml;
+
+      // --- Thresholds ---
+      const threshKeys = ['threshold.urgentHours', 'threshold.reminderHours'];
+      let threshHtml = '';
+      for (const key of threshKeys) {
+        const sp = schema[key] || {};
+        const ctrl = `<input type="number" data-setting="${key}" value="${escapeHtml(s[key] != null ? s[key] : '')}" min="0">`;
+        threshHtml += adminRow(key, sp.label || key, '', ctrl);
+      }
+      document.getElementById('thresholdSection').innerHTML = threshHtml;
+
+      // --- Recipients ---
+      const recKeys = ['recipients.ownerEmail', 'recipients.accountantEmail', 'recipients.testSender'];
+      let recHtml = '';
+      for (const key of recKeys) {
+        const sp = schema[key] || {};
+        const ctrl = `<input type="email" data-setting="${key}" value="${escapeHtml(s[key] || '')}">`;
+        recHtml += adminRow(key, sp.label || key, '', ctrl);
+      }
+      document.getElementById('recipientsSection').innerHTML = recHtml;
+
+      // Bind all settings inputs
+      bindSettingsInputs();
+    }
+
+    const _settingsTimers = {};
+    function bindSettingsInputs() {
+      document.querySelectorAll('[data-setting]').forEach(el => {
+        const key = el.dataset.setting;
+        if (el.type === 'checkbox') {
+          el.addEventListener('change', () => {
+            saveSetting(key, el.checked);
+            // Update the "På"/"Av" label next to the switch
+            const lbl = el.closest('.value-cell')?.querySelector('.switch-label');
+            if (lbl) lbl.textContent = el.checked ? 'På' : 'Av';
+          });
+        } else {
+          el.addEventListener('input', () => {
+            clearTimeout(_settingsTimers[key]);
+            setSettingIndicator(key, 'saving', 'Lagrer…');
+            _settingsTimers[key] = setTimeout(() => saveSetting(key, el.value), 800);
+          });
+          el.addEventListener('blur', () => {
+            if (_settingsTimers[key]) {
+              clearTimeout(_settingsTimers[key]);
+              saveSetting(key, el.value);
+            }
+          });
+        }
+      });
+    }
+
+    function setSettingValue(key, value) {
+      const el = document.querySelector(`[data-setting="${key}"]`);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!value;
+      else el.value = value;
+      saveSetting(key, value);
+    }
+
+    function setSettingIndicator(key, state, text) {
+      const el = document.querySelector(`[data-indicator-for-key="${key}"]`);
+      if (!el) return;
+      el.className = 'indicator ' + (state || '');
+      el.textContent = text;
+    }
+
+    async function saveSetting(key, value) {
+      setSettingIndicator(key, 'saving', 'Lagrer…');
+      try {
+        // Coerce numeric strings to numbers based on schema (best-effort)
+        const numericPrefixes = ['threshold.', 'travel.satsKr', 'travel.inkludertKm', 'mva.rate'];
+        let payload = value;
+        if (numericPrefixes.some(p => key.startsWith(p) || key === p)) {
+          const n = parseFloat(String(value).replace(',', '.'));
+          if (Number.isFinite(n)) payload = n;
+        }
+
+        const res = await fetch('/api/settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [key]: payload }),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        setSettingIndicator(key, 'saved', data.demoMode ? 'Demo: simulert' : '✓ Lagret');
+        setTimeout(() => setSettingIndicator(key, '', ''), 2500);
+      } catch (e) {
+        setSettingIndicator(key, 'error', 'Feil: ' + e.message);
+      }
+    }
+
+    async function runJobManually(jobName) {
+      try {
+        showToast(`Trigger ${jobName}…`, 'success');
+        const res = await fetch(`/api/admin/trigger/${jobName}`, { method: 'POST' });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        showToast(`${jobName}: ${data.demoMode ? 'simulert (demo)' : 'OK'}`, 'success');
+        loadActivity();
+      } catch (e) {
+        showToast(`${jobName}: ${e.message}`, 'error');
+      }
+    }
+
+    async function loadJobs() {
+      try {
+        const res = await fetch('/api/admin/jobs');
+        const data = await res.json();
+        if (!data.success) return;
+        // Annotate each cron-row indicator with active state
+        for (const job of data.jobs) {
+          const indicatorEl = document.querySelector(`[data-indicator-for-key="${job.settingsKey}"]`);
+          if (indicatorEl) {
+            indicatorEl.textContent = job.active ? '● Aktiv' : '○ Pauset';
+            indicatorEl.style.color = job.active ? '#2e7d32' : '#999';
+          }
+        }
+      } catch {}
+    }
+
+    async function loadActivity() {
+      try {
+        const res = await fetch('/api/activity?limit=50');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        renderActivity(data.entries || []);
+      } catch (e) {
+        // Silently fail — leave previous content
+      }
+    }
+
+    function renderActivity(entries) {
+      const list = document.getElementById('activityList');
+      if (entries.length === 0) {
+        list.innerHTML = '<div class="log-empty">Ingen hendelser ennå.</div>';
+        return;
+      }
+      const html = entries.map(e => {
+        const t = new Date(e.ts);
+        const timeStr = t.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = t.toLocaleDateString('nb-NO', { day: '2-digit', month: '2-digit' });
+        return `<div class="log-entry">
+          <span class="ts">${dateStr} ${timeStr}</span>
+          <span><span class="type type-${escapeHtml(e.type)}">${escapeHtml(e.type)}</span></span>
+          <span>${escapeHtml(e.message)}</span>
+        </div>`;
+      }).join('');
+      list.innerHTML = html;
+    }
+
+    // ── Intake form ──
+    function openIntake() {
+      const modal = document.getElementById('intakeModal');
+      const form = document.getElementById('intakeForm');
+      form.reset();
+      document.getElementById('err-adresse').textContent = '';
+      document.getElementById('intakeStatus').textContent = '';
+      document.getElementById('intakeSubmit').disabled = false;
+      modal.classList.add('on');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => document.getElementById('i-adresse').focus(), 100);
+    }
+
+    function closeIntake() {
+      document.getElementById('intakeModal').classList.remove('on');
+      document.body.style.overflow = '';
+    }
+
+    function onIntakeBackdropClick(e) {
+      if (e.target.id === 'intakeModal') closeIntake();
+    }
+
+    async function submitIntake(e) {
+      e.preventDefault();
+      const form = document.getElementById('intakeForm');
+      const submitBtn = document.getElementById('intakeSubmit');
+      const statusEl = document.getElementById('intakeStatus');
+      const errAdresse = document.getElementById('err-adresse');
+
+      errAdresse.textContent = '';
+
+      // Build body from form fields
+      const fd = new FormData(form);
+      const body = {};
+      for (const [k, v] of fd.entries()) {
+        const trimmed = String(v).trim();
+        if (trimmed) body[k] = trimmed;
+      }
+
+      // Client-side check (server also enforces)
+      if (!body.adresse) {
+        errAdresse.textContent = 'Adresse er påkrevd';
+        document.getElementById('i-adresse').focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = 'Registrerer…';
+
+      try {
+        const res = await fetch('/api/register-oppdrag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+
+        if (data.demoMode) {
+          showToast('Demo: oppdrag registrert (ikke lagret)', 'success');
+        } else {
+          const num = data.oppdragsnr || '(ukjent nummer)';
+          showToast(`Oppdrag registrert: ${num}`, 'success');
+        }
+        closeIntake();
+        // Refresh list to show new oppdrag
+        loadData();
+      } catch (err) {
+        statusEl.textContent = '';
+        showToast('Kunne ikke registrere: ' + err.message, 'error');
+        submitBtn.disabled = false;
+      }
+    }
+
+    // Esc closes intake modal too
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('intakeModal').classList.contains('on')) {
+        closeIntake();
+      }
+    });
+
+    function showToast(msg, type) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = `toast ${type === 'error' ? 'error' : 'success'} show`;
+      setTimeout(() => { toast.className = 'toast'; }, 4000);
+    }
+
+    // ── Init ──
+    loadCurrentUser();
+    loadData();
+    // Auto-refresh every 60 s
+    setInterval(loadData, 60000);
+  </script>
+</body>
+</html>

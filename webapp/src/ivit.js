@@ -89,6 +89,13 @@ async function processIVITScraping() {
         updates.push({ col: COL.MED_MARKEDSVERDI, value: true });
       }
 
+      // Auto-promote status to 'Avtalt befaring' if befaring_dato found and currently 'Mottatt'
+      if (d.befaring_dato && row[COL.STATUS - 1] === 'Mottatt') {
+        const { formatDate } = require('./utils');
+        updates.push({ col: COL.STATUS, value: 'Avtalt befaring' });
+        updates.push({ col: COL.DATO_STATUSENDRING, value: formatDate(new Date(), 'dd.MM.yyyy HH:mm') });
+      }
+
       updates.push({ col: COL.SCAN_IVIT, value: false });
 
       await google.updateCells(config.sheet.name, rowNum, updates);

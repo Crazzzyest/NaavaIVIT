@@ -113,15 +113,16 @@ function buildFakturaEmail(rowData, datoStr) {
   return html;
 }
 
-function buildBefaringEmail(adresse, dato, tid, selgerNavn, oppdragstype) {
+function buildBefaringEmail(adresse, dato, tid, selgerNavn, oppdragstype, templates = {}) {
   const kundeNavn = selgerNavn || 'kunde';
+  const intro = templates.intro || 'Vi bekrefter herved avtalt befaring på følgende eiendom:';
 
   return '<div style="font-family:Arial,sans-serif;max-width:600px;">' +
     '<div style="background:#1a5c2a;color:white;padding:20px;border-radius:8px 8px 0 0;text-align:center;">' +
     '<h2 style="margin:0;">Bekreftelse på befaring</h2></div>' +
     '<div style="padding:24px;border:1px solid #ddd;border-top:none;">' +
     `<p>Hei ${kundeNavn},</p>` +
-    '<p>Vi bekrefter herved avtalt befaring på følgende eiendom:</p>' +
+    `<p>${intro}</p>` +
     '<table style="width:100%;border-collapse:collapse;margin:16px 0;">' +
     `<tr style="background:#f5f5f5;"><td style="padding:10px;font-weight:bold;">Adresse:</td><td style="padding:10px;">${adresse}</td></tr>` +
     `<tr><td style="padding:10px;font-weight:bold;">Type oppdrag:</td><td style="padding:10px;">${oppdragstype}</td></tr>` +
@@ -154,11 +155,12 @@ function buildBefaringEmail(adresse, dato, tid, selgerNavn, oppdragstype) {
 
     '<p style="margin-top:16px;color:#666;">Har du spørsmål? Ta gjerne kontakt.</p></div>' +
     '<div style="background:#f5f5f5;padding:16px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;font-size:13px;color:#666;">' +
-    '<strong>Jacob Engholm Holen</strong><br>Takstingeniør<br>+47 469 49 615<br>jacob@naava.no<br>www.naava.no<br><br>' +
-    '<em>Medlem av Norsk Takst og NITO</em></div></div>';
+    (templates.signatureHtml || '<strong>Jacob Engholm Holen</strong><br>Takstingeniør<br>+47 469 49 615<br>jacob@naava.no<br>www.naava.no<br><br><em>Medlem av Norsk Takst og NITO</em>') +
+    '</div></div>';
 }
 
-function buildNewOppdragEmail(parsed, dato, folderUrl, oppdragsnr, avstandKm, reiseEks, reiseInkl) {
+function buildNewOppdragEmail(parsed, dato, folderUrl, oppdragsnr, avstandKm, reiseEks, reiseInkl, templates = {}) {
+  const intro = templates.intro || 'Et nytt takstoppdrag er registrert i systemet.';
   const fields = [
     ['Oppdragsnr', oppdragsnr], ['Type', parsed.oppdragstype], ['Kilde', parsed.kilde],
     ['Adresse', parsed.adresse], ['Oppdragsgiver', parsed.oppdragsgiver],
@@ -184,6 +186,7 @@ function buildNewOppdragEmail(parsed, dato, folderUrl, oppdragsnr, avstandKm, re
     `<h2 style="margin:0;">${parsed.oppdragstype}</h2></div>` +
     '<div style="padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;">' +
     (config.testMode ? '<div style="background:#fff3e0;padding:8px;border-radius:4px;margin-bottom:12px;">TESTMODUS</div>' : '') +
+    `<p style="margin:0 0 16px;">${intro}</p>` +
     `<table style="width:100%;border-collapse:collapse;">${detailRows}</table>` +
     `<p style="margin-top:16px;"><a href="${folderUrl}" style="background:#1a5c2a;color:white;padding:10px 20px;text-decoration:none;border-radius:4px;">Åpne mappe</a></p></div></div>`;
 }

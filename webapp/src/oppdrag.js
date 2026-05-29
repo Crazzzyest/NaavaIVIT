@@ -219,6 +219,38 @@ async function calculatePriceForRow(row) {
 // CREATE NEW OPPDRAG
 // ============================================================
 
+// Strip hyperlink wrapper and take only street + number (before first comma)
+function cleanAddrForDupCheck(addr) {
+  let s = String(addr || '').toLowerCase();
+  const m = s.match(/=hyperlink\("[^"]+","([^"]+)"\)/);
+  if (m) s = m[1].replace(/""/g, '"');
+  return s.split(',')[0].trim();
+}
+
+// Returns true if same address (street+number) already exists in given month
+function hasSameMonthDuplicate(data, incomingAddrClean, date) {
+  if (!incomingAddrClean || incomingAddrClean.length < 4) return false;
+  const targetMonth = date.getMonth();
+  const targetYear = date.getFullYear();
+
+  for (let i = 1; i < data.length; i++) {
+    let rowDate = data[i][COL.TIMESTAMP - 1];
+    if (rowDate) rowDate = new Date(rowDate);
+    if (!rowDate || isNaN(rowDate.getTime())) {
+      const dm = data[i][COL.DATO_MOTTATT - 1];
+      const parts = String(dm || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      if (parts) rowDate = new Date(parts[3], parts[2] - 1, parts[1]);
+    }
+    if (!(rowDate instanceof Date) || isNaN(rowDate.getTime())) continue;
+    if (rowDate.getMonth() !== targetMonth || rowDate.getFullYear() !== targetYear) continue;
+
+    if (cleanAddrForDupCheck(data[i][COL.ADRESSE - 1]) === incomingAddrClean) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function createNewOppdrag(parsed, date) {
   try {
     console.log(`>>> createNewOppdrag: ${parsed.adresse}`);
@@ -228,8 +260,6 @@ async function createNewOppdrag(parsed, date) {
 
     // Duplicate check
     if (lastRow > 1) {
-      const incomingAddrBase = (parsed.adresse || '').split(',')[0].trim().toLowerCase();
-
       for (let i = 1; i < data.length; i++) {
         const rowAddrRaw = String(data[i][COL.ADRESSE - 1] || '');
         const rowTimestamp = data[i][COL.TIMESTAMP - 1];
@@ -243,6 +273,10 @@ async function createNewOppdrag(parsed, date) {
         }
       }
     }
+
+    // Same-month duplicate warning (does not abort, just flags)
+    const incomingAddrClean = cleanAddrForDupCheck(parsed.adresse);
+    const sameMonthDup = hasSameMonthDuplicate(data, incomingAddrClean, date);
 
     const oppdragsnr = 'NT-' + formatDate(date, 'yyyyMM') + '-' + String(lastRow).padStart(3, '0');
     console.log(`  Oppdragsnr: ${oppdragsnr}`);
@@ -283,6 +317,10 @@ async function createNewOppdrag(parsed, date) {
     let fullNotater = '';
     if (parsed.notater) fullNotater += parsed.notater;
     if (reiseNotat) fullNotater += (fullNotater ? ' | ' : '') + 'Reise: ' + reiseNotat;
+    if (sameMonthDup) {
+      const warning = '⚠️ Samme adresse reg. tidligere denne mnd!';
+      fullNotater += (fullNotater ? ' | ' : '') + warning;
+    }
 
     // Build row (NUM_COLS elements)
     const newRow = new Array(NUM_COLS).fill('');
@@ -336,16 +374,23 @@ async function handleStatusChange(row, newStatus) {
   const data = await google.getSheetData(config.sheet.name);
   const rowData = data[row - 1];
 
+  // Load settings once (cached) — controls email enables + subject template
+  const settings = await require('./settings').get();
+  const { substitute, extractAddressFromHyperlink } = require('./utils');
+
   if (newStatus === 'Kan faktureres') {
     const { buildFakturaEmail } = require('./emails');
-    const adresse = rowData[COL.ADRESSE - 1];
+    const adresse = extractAddressFromHyperlink(rowData[COL.ADRESSE - 1]);
     const oppdragsnr = rowData[COL.OPPDRAGSNR - 1];
 
-    await google.sendEmail(
-      config.email.accountantEmail,
-      `Klar til fakturering: ${adresse} (${oppdragsnr})`,
-      buildFakturaEmail(rowData, datoStr),
-    );
+    if (settings['email.sendFakturaToAccountant']) {
+      const subject = substitute(settings['email.fakturaSubject'], { adresse, oppdragsnr });
+      await google.sendEmail(
+        config.email.accountantEmail,
+        subject,
+        buildFakturaEmail(rowData, datoStr),
+      );
+    }
 
     await google.updateCells(config.sheet.name, row, [
       { col: COL.STATUS, value: 'Fakturert' },
@@ -412,6 +457,28 @@ async function handleBefaringBooked(row) {
       { col: COL.DATO_STATUSENDRING, value: formatDate(now, 'dd.MM.yyyy HH:mm') },
     ]);
   }
+
+  // Send befaringsbekreftelse to customer if enabled
+  const settings = await require('./settings').get();
+  if (settings['email.sendBefaringConfirmation']) {
+    const { buildBefaringEmail } = require('./emails');
+    const { extractAddressFromHyperlink, substitute } = require('./utils');
+    const adresse = extractAddressFromHyperlink(rowData[COL.ADRESSE - 1]);
+    const befaringDato = rowData[COL.BEFARING_DATO - 1] || '';
+    const befaringKl = rowData[COL.BEFARING_KL - 1] || '';
+    const selgerNavn = rowData[COL.SELGER - 1] || '';
+    const selgerEpost = rowData[COL.SELGER_EPOST - 1];
+    const meglerEpost = rowData[COL.MEGLER_EPOST - 1];
+    const oppdragstype = rowData[COL.OPPDRAGSTYPE - 1] || 'Oppdrag';
+    const to = selgerEpost || meglerEpost || config.email.ownerEmail;
+
+    const subject = substitute(settings['email.befaringSubject'], { adresse, befaringDato, befaringKl, selger: selgerNavn });
+    const html = buildBefaringEmail(adresse, befaringDato, befaringKl, selgerNavn, oppdragstype, {
+      intro: settings['email.befaringIntro'],
+      signatureHtml: settings['email.signatureHtml'],
+    });
+    await google.sendEmail(to, subject, html);
+  }
 }
 
 // ============================================================
@@ -455,10 +522,27 @@ async function sendFakturaTilRegnskap() {
       const adresse = rowData[COL.ADRESSE - 1];
       const datoStr = formatDate(new Date(), 'dd.MM.yyyy HH:mm');
 
+      // Settings-controlled toggle + subject
+      const settings = await require('./settings').get();
+      const { substitute, extractAddressFromHyperlink } = require('./utils');
+      const cleanAdr = extractAddressFromHyperlink(adresse);
+
+      if (!settings['email.sendFakturaToAccountant']) {
+        // Still mark as Fakturert + archive, but skip email
+        await google.updateCells(config.sheet.name, rowNum, [
+          { col: COL.KAN_FAKTURERES, value: false },
+          { col: COL.STATUS, value: 'Fakturert' },
+        ]);
+        await archiveRow(rowData);
+        count++;
+        continue;
+      }
+
+      const subject = substitute(settings['email.fakturaSubject'], { adresse: cleanAdr, oppdragsnr });
       const html = buildFakturaEmail(rowData, datoStr);
       await google.sendEmail(
         config.email.accountantEmail,
-        `Klar til fakturering: ${adresse} (${oppdragsnr})`,
+        subject,
         html,
       );
 

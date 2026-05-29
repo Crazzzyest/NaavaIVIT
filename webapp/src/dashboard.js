@@ -3,44 +3,78 @@ const { COL } = require('./columns');
 const google = require('./google');
 const { formatCurrency, parseDateString, classifyBoligBucket, formatDate } = require('./utils');
 
-async function updateDashboard() {
-  console.log('Updating dashboard...');
+const STATUS_LIST = ['Mottatt', 'Avtalt befaring', 'Befart', 'Utkast', 'Endelig rapport', 'Kan faktureres', 'Fakturert', 'Oppdrag kansellert', 'Oppdrag fullført'];
 
-  const data = await google.getSheetData(config.sheet.name);
-  if (!data || data.length < 2) {
-    await google.writeRange(config.sheet.dashboardName, 1, 1, [['Ingen oppdrag ennå.']]);
-    return;
-  }
-
-  const now = new Date();
+// ============================================================
+// computeDashboardStats — pure function. Returns the stats object.
+// Used by both updateDashboard() (writes to Sheet) and /api/dashboard-stats
+// (returns JSON to frontend).
+// ============================================================
+function computeDashboardStats(data, opts = {}) {
+  const monthsToShow = opts.monthsToShow || 12;
+  const now = opts.now || new Date();
   const curMonth = now.getMonth();
   const curYear = now.getFullYear();
 
-  const statusList = ['Mottatt', 'Avtalt befaring', 'Befart', 'Utkast', 'Endelig rapport', 'Kan faktureres', 'Fakturert', 'Oppdrag kansellert', 'Oppdrag fullført'];
   const stats = {
-    total: data.length - 1,
+    total: Math.max(0, (data?.length || 0) - 1),
     byStatus: {},
     byType: {},
     byBoligBucket: {},
+    byTypeOms: {},        // omsetning per oppdragstype
     omsMåned: 0, omsÅr: 0,
     reiseMåned: 0, reiseÅr: 0,
     uteståendeInkl: 0, uteståendeEks: 0,
     snittPrisInkl: 0, snittPrisEks: 0, snittAntall: 0,
-    trendMonths: {},
+    trendMonths: [],
+    omsAlle: 0,           // alle ikke-kansellerte med pris
+    omsFakturert: 0,      // kun Fakturert (innkommet/realisert)
+    countFakturert: 0,
+    fakturertÅr: 0,
+    timestamp: now.toISOString(),
   };
 
-  statusList.forEach(s => { stats.byStatus[s] = 0; });
+  STATUS_LIST.forEach(s => { stats.byStatus[s] = 0; });
 
-  const monthsToShow = 6;
-  const monthKeys = [];
+  // Build last-N month buckets
+  const monthMap = {};
   for (let k = monthsToShow - 1; k >= 0; k--) {
     const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    monthKeys.push(key);
-    stats.trendMonths[key] = { omsInkl: 0, reiseInkl: 0, totalInkl: 0 };
+    const label = d.toLocaleDateString('nb-NO', { month: 'short', year: '2-digit' });
+    const entry = { key, label, omsInkl: 0, reiseInkl: 0, totalInkl: 0, count: 0 };
+    stats.trendMonths.push(entry);
+    monthMap[key] = entry;
   }
 
   let sumPrisInkl = 0, sumPrisEks = 0, countPris = 0;
+
+  if (!data || data.length < 2) {
+    return stats;
+  }
+
+  // Robust numeric parse for sheet values like "16 000 kr" or "12,800 kr"
+  function num(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return v;
+    let s = String(v).replace(/[^\d.,-]/g, '').replace(/\s/g, '');
+    if (!s) return 0;
+    const hasComma = s.includes(',');
+    const hasDot = s.includes('.');
+    if (hasComma && hasDot) {
+      s = s.replace(/,/g, '');
+    } else if (hasComma) {
+      const parts = s.split(',');
+      const isThousand = parts.length > 1 && parts[parts.length - 1].length === 3 && parts.every((p, i) => i === 0 || p.length === 3);
+      s = isThousand ? s.replace(/,/g, '') : s.replace(',', '.');
+    } else if (hasDot) {
+      const parts = s.split('.');
+      const isThousand = parts.length > 1 && parts[parts.length - 1].length === 3 && parts.every((p, i) => i === 0 || p.length === 3);
+      if (isThousand) s = s.replace(/\./g, '');
+    }
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : 0;
+  }
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
@@ -48,9 +82,9 @@ async function updateDashboard() {
     const type = row[COL.OPPDRAGSTYPE - 1];
     const bolig = row[COL.BOLIGTYPE - 1];
     const areal = row[COL.AREAL - 1] ? Number(row[COL.AREAL - 1]) : 0;
-    const prisInkl = Number(row[COL.PRIS_INKL - 1] || 0);
-    const prisEks = Number(row[COL.PRIS_EKS - 1] || 0);
-    const reiseInkl = Number(row[COL.REISE_INKL - 1] || 0);
+    const prisInkl = num(row[COL.PRIS_INKL - 1]);
+    const prisEks = num(row[COL.PRIS_EKS - 1]);
+    const reiseInkl = num(row[COL.REISE_INKL - 1]);
 
     if (stats.byStatus[status] !== undefined) stats.byStatus[status]++;
     if (type) stats.byType[type] = (stats.byType[type] || 0) + 1;
@@ -63,33 +97,68 @@ async function updateDashboard() {
       stats.uteståendeEks += Math.round((prisInkl + reiseInkl) / (1 + config.mvaRate));
     }
 
-    if (status === 'Fakturert' || status === 'Kan faktureres') {
+    const isCancelled = status === 'Oppdrag kansellert';
+    if (!isCancelled && prisInkl > 0) {
       stats.omsÅr += prisInkl;
+      stats.omsAlle += prisInkl;
       stats.reiseÅr += reiseInkl;
 
-      const statusDato = parseDateString(row[COL.DATO_STATUSENDRING - 1]);
+      if (type) stats.byTypeOms[type] = (stats.byTypeOms[type] || 0) + prisInkl;
+
+      const statusDato = parseDateString(row[COL.DATO_STATUSENDRING - 1]) || parseDateString(row[COL.DATO_MOTTATT - 1]);
       if (statusDato) {
         if (statusDato.getMonth() === curMonth && statusDato.getFullYear() === curYear) {
           stats.omsMåned += prisInkl;
           stats.reiseMåned += reiseInkl;
         }
         const mKey = `${statusDato.getFullYear()}-${String(statusDato.getMonth() + 1).padStart(2, '0')}`;
-        if (stats.trendMonths[mKey]) {
-          stats.trendMonths[mKey].omsInkl += prisInkl;
-          stats.trendMonths[mKey].reiseInkl += reiseInkl;
-          stats.trendMonths[mKey].totalInkl += (prisInkl + reiseInkl);
+        if (monthMap[mKey]) {
+          monthMap[mKey].omsInkl += prisInkl;
+          monthMap[mKey].reiseInkl += reiseInkl;
+          monthMap[mKey].totalInkl += (prisInkl + reiseInkl);
+          monthMap[mKey].count++;
         }
       }
 
-      if (prisInkl > 0) { sumPrisInkl += prisInkl; sumPrisEks += prisEks; countPris++; }
+      sumPrisInkl += prisInkl;
+      sumPrisEks += prisEks;
+      countPris++;
+    }
+
+    if (status === 'Fakturert' && prisInkl > 0) {
+      stats.omsFakturert += prisInkl;
+      stats.fakturertÅr += prisInkl;
+      stats.countFakturert++;
     }
   }
 
   stats.snittAntall = countPris;
   stats.snittPrisInkl = countPris ? Math.round(sumPrisInkl / countPris) : 0;
   stats.snittPrisEks = countPris ? Math.round(sumPrisEks / countPris) : 0;
+  stats.active = stats.total
+    - (stats.byStatus['Fakturert'] || 0)
+    - (stats.byStatus['Oppdrag kansellert'] || 0)
+    - (stats.byStatus['Oppdrag fullført'] || 0);
 
-  // Build dashboard rows
+  return stats;
+}
+
+// ============================================================
+// updateDashboard — writes a flattened table of stats into the
+// Dashboard-tab in the Google Sheet (legacy mirror of Apps Script behavior).
+// ============================================================
+async function updateDashboard() {
+  console.log('Updating dashboard...');
+
+  const data = await google.getSheetData(config.sheet.name);
+  if (!data || data.length < 2) {
+    await google.writeRange(config.sheet.dashboardName, 1, 1, [['Ingen oppdrag ennå.']]);
+    return;
+  }
+
+  const stats = computeDashboardStats(data, { monthsToShow: 6 });
+  const now = new Date();
+
   const rows = [];
   rows.push(['NAAVA TAKST DASHBOARD' + (config.testMode ? ' TEST' : ''), '', '', '', '']);
   rows.push([formatDate(now, 'dd.MM.yyyy HH:mm'), '', '', '', '']);
@@ -97,7 +166,7 @@ async function updateDashboard() {
 
   rows.push(['OVERSIKT', '', '', '', '']);
   rows.push(['Totalt antall oppdrag', stats.total, '', '', '']);
-  rows.push(['Aktive (ikke Fakturert)', stats.total - (stats.byStatus['Fakturert'] || 0) - (stats.byStatus['Oppdrag kansellert'] || 0) - (stats.byStatus['Oppdrag fullført'] || 0), '', '', '']);
+  rows.push(['Aktive (ikke Fakturert)', stats.active, '', '', '']);
   rows.push(['Utestående fordringer (Eks mva)', formatCurrency(stats.uteståendeEks), '', '', '']);
   rows.push(['Utestående fordringer (Inkl mva)', formatCurrency(stats.uteståendeInkl), '', '', '']);
   rows.push(['Gjennomsnitt pris per oppdrag (Eks mva)', formatCurrency(stats.snittPrisEks), '', '', '']);
@@ -115,7 +184,7 @@ async function updateDashboard() {
   rows.push(['', '', '', '', '']);
 
   rows.push(['STATUS', 'Antall', '', '', '']);
-  statusList.forEach(s => rows.push([s, stats.byStatus[s] || 0, '', '', '']));
+  STATUS_LIST.forEach(s => rows.push([s, stats.byStatus[s] || 0, '', '', '']));
   rows.push(['', '', '', '', '']);
 
   rows.push(['OPPDRAGSTYPER', 'Antall', '', '', '']);
@@ -127,13 +196,11 @@ async function updateDashboard() {
   Object.keys(stats.byBoligBucket).sort().forEach(k => rows.push([k, stats.byBoligBucket[k], '', '', '']));
   rows.push(['', '', '', '', '']);
 
-  rows.push([`INNTJENING SISTE ${monthsToShow} MND (Inkl mva)`, 'Oppdrag', 'Reise', 'Total', '']);
-  monthKeys.forEach(k => {
-    const v = stats.trendMonths[k];
-    rows.push([k, v.omsInkl, v.reiseInkl, v.totalInkl, '']);
+  rows.push([`INNTJENING SISTE 6 MND (Inkl mva)`, 'Oppdrag', 'Reise', 'Total', '']);
+  stats.trendMonths.forEach(m => {
+    rows.push([m.key, m.omsInkl, m.reiseInkl, m.totalInkl, '']);
   });
 
-  // Clear and write
   try {
     await google.clearRange(config.sheet.dashboardName, 1, 200, 5);
   } catch { /* ignore if empty */ }
@@ -142,4 +209,4 @@ async function updateDashboard() {
   console.log('Dashboard updated');
 }
 
-module.exports = { updateDashboard };
+module.exports = { updateDashboard, computeDashboardStats, STATUS_LIST };

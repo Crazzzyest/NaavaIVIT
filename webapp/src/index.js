@@ -1,20 +1,282 @@
+const path = require('path');
 const express = require('express');
-const cron = require('node-cron');
+const session = require('express-session');
+const passport = require('passport');
 const config = require('./config');
+const { configurePassport } = require('./auth/google-oauth');
+const requireAuth = require('./middleware/requireAuth');
+const activity = require('./middleware/activityLog');
+const cronMgr = require('./cron-manager');
+const settingsModule = require('./settings');
 
 const app = express();
+
+// Trust Sliplane's TLS-terminating proxy so secure cookies work
+app.set('trust proxy', 1);
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '..', 'views'));
+
 app.use(express.json());
 
+app.use(session({
+  secret: config.session.secret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: config.session.maxAgeMs,
+  },
+}));
+
+configurePassport();
+app.use(passport.initialize());
+app.use(passport.session());
+
 // ============================================================
-// ROUTES
+// PUBLIC ROUTES (no auth)
 // ============================================================
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', testMode: config.testMode, timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    testMode: config.testMode,
+    demoMode: config.demoMode,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/login', (req, res) => {
+  if (req.session && req.session.user) return res.redirect('/');
+  res.render('login', { error: req.query.error || null });
+});
+
+app.get('/auth/google', passport.authenticate('google', { scope: ['openid', 'email', 'profile'] }));
+
+app.get('/auth/google/callback', (req, res, next) => {
+  passport.authenticate('google', (err, user, info) => {
+    if (err) {
+      console.error('OAuth error:', err);
+      return res.redirect('/login?error=failed');
+    }
+    if (!user) {
+      const reason = info && info.message === 'denied' ? 'denied' : 'failed';
+      return res.redirect(`/login?error=${reason}`);
+    }
+    req.session.user = user;
+    activity.login(`Logget inn: ${user.email}`);
+    return res.redirect('/');
+  })(req, res, next);
+});
+
+app.post('/auth/logout', (req, res) => {
+  const email = req.session.user?.email;
+  if (email) activity.login(`Logget ut: ${email}`);
+  req.session.destroy(() => res.redirect('/login'));
+});
+
+app.get('/auth/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login'));
+});
+
+// Dev-only: shortcut to create a session without going through Google.
+// Active ONLY when NODE_ENV !== 'production' AND DEV_LOGIN_ENABLED=true.
+if (process.env.NODE_ENV !== 'production' && process.env.DEV_LOGIN_ENABLED === 'true') {
+  app.get('/auth/dev-login', (req, res) => {
+    const email = (req.query.email || config.allowedEmails[0] || 'dev@example.com').toLowerCase();
+    req.session.user = { email, name: 'Dev User', picture: null };
+    res.redirect('/');
+  });
+  console.log('DEV LOGIN ENABLED: /auth/dev-login is active. NEVER set this in production.');
+}
+
+// ============================================================
+// AUTH GATE — everything below requires a session
+// ============================================================
+
+app.use(requireAuth);
+
+// Static assets (public/) — gated: only authenticated users get the SPA shell + assets
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// ============================================================
+// API ROUTES (auth-protected)
+// ============================================================
+
+// Demo-mode short-circuit helper for write endpoints
+function demoOk(res, message) {
+  return res.json({ success: true, demoMode: true, message: `Demo: ${message}` });
+}
+
+// --- Session / current user ---
+app.get('/api/me', (req, res) => {
+  res.json({
+    success: true,
+    user: req.session.user,
+    testMode: config.testMode,
+    demoMode: config.demoMode,
+    webappCronEnabled: config.webappCronEnabled,
+  });
+});
+
+// --- Settings ---
+app.get('/api/settings', async (req, res) => {
+  try {
+    const data = await settingsModule.get();
+    res.json({ success: true, settings: data, schema: settingsModule.SCHEMA, defaults: settingsModule.DEFAULTS });
+  } catch (e) {
+    console.error('get-settings error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.patch('/api/settings', async (req, res) => {
+  if (config.demoMode) {
+    activity.admin('Demo: innstillinger oppdatert (ikke lagret)', { updates: req.body });
+    return res.json({ success: true, demoMode: true, message: 'Demo: innstillinger simulert lagret' });
+  }
+  try {
+    const updates = req.body || {};
+    const result = await settingsModule.patch(updates);
+    // Reapply cron schedules if any cron.* key changed
+    if (Object.keys(updates).some(k => k.startsWith('cron.'))) {
+      await cronMgr.applyScheduleFromSettings();
+      activity.admin('Cron-jobber re-registrert etter endring av tidsplan', { keys: Object.keys(updates).filter(k => k.startsWith('cron.')) });
+    }
+    activity.admin('Innstillinger oppdatert', { updated: Object.keys(updates) });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('patch-settings error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Activity log ---
+app.get('/api/activity', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+  res.json({ success: true, entries: activity.list(limit) });
+});
+
+// --- Cron job introspection ---
+app.get('/api/admin/jobs', (req, res) => {
+  res.json({ success: true, jobs: cronMgr.listJobs() });
+});
+
+// --- Manual trigger of a cron job ---
+app.post('/api/admin/trigger/:job', async (req, res) => {
+  if (config.demoMode) {
+    activity.admin(`Demo: manuelt trigget "${req.params.job}"`);
+    return res.json({ success: true, demoMode: true, message: `Demo: ${req.params.job} simulert` });
+  }
+  try {
+    activity.admin(`Manuelt trigget "${req.params.job}"`, { by: req.session.user?.email });
+    const result = await cronMgr.runJob(req.params.job);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error(`manual-trigger error (${req.params.job}):`, e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Dashboard data (oppdrag list + KPIs) ---
+app.get('/api/dashboard-data', async (req, res) => {
+  try {
+    const { getDashboardData } = require('./data');
+    const data = await getDashboardData();
+    res.json(data);
+  } catch (e) {
+    console.error('dashboard-data error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Dashboard stats (full breakdowns + trend, no oppdrag list) ---
+app.get('/api/dashboard-stats', async (req, res) => {
+  try {
+    const { getDashboardStats } = require('./data');
+    const stats = await getDashboardStats();
+    res.json({ success: true, stats });
+  } catch (e) {
+    console.error('dashboard-stats error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Single oppdrag ---
+app.get('/api/oppdrag/:row', async (req, res) => {
+  try {
+    const rowNum = parseInt(req.params.row, 10);
+    if (!Number.isInteger(rowNum) || rowNum < 2) {
+      return res.status(400).json({ success: false, error: 'invalid row' });
+    }
+    const { getOppdrag } = require('./data');
+    const oppdrag = await getOppdrag(rowNum);
+    if (!oppdrag) return res.status(404).json({ success: false, error: 'not found' });
+    res.json({ success: true, oppdrag });
+  } catch (e) {
+    console.error('get-oppdrag error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Patch oppdrag (whitelisted fields) ---
+app.patch('/api/oppdrag/:row', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'felt oppdatert (ikke lagret)');
+  try {
+    const rowNum = parseInt(req.params.row, 10);
+    if (!Number.isInteger(rowNum) || rowNum < 2) {
+      return res.status(400).json({ success: false, error: 'invalid row' });
+    }
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ success: false, error: 'body must be JSON object' });
+    }
+    const { patchOppdrag, getOppdrag } = require('./data');
+    const result = await patchOppdrag(rowNum, req.body);
+    const oppdrag = await getOppdrag(rowNum);
+    activity.patch(`Rad ${rowNum} oppdatert (${Object.keys(req.body).join(', ')})`, { by: req.session.user?.email, rowNum, fields: Object.keys(req.body) });
+    res.json({ success: true, ...result, oppdrag });
+  } catch (e) {
+    console.error('patch-oppdrag error:', e);
+    activity.error(`PATCH rad ${req.params.row} feilet: ${e.message}`);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Change status (routes through handleStatusChange for side effects) ---
+app.post('/api/oppdrag/:row/status', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'status endret (ikke lagret)');
+  try {
+    const rowNum = parseInt(req.params.row, 10);
+    const { status } = req.body || {};
+    if (!Number.isInteger(rowNum) || rowNum < 2 || !status) {
+      return res.status(400).json({ success: false, error: 'row and status required' });
+    }
+    const google = require('./google');
+    const { COL } = require('./columns');
+    await google.updateCell(config.sheet.name, rowNum, COL.STATUS, status);
+    const { handleStatusChange } = require('./oppdrag');
+    await handleStatusChange(rowNum, status);
+    const { bustCache, getOppdrag } = require('./data');
+    bustCache();
+    const oppdrag = await getOppdrag(rowNum);
+    activity.status(`Rad ${rowNum}: status → "${status}"`, { by: req.session.user?.email, rowNum, status });
+    res.json({ success: true, oppdrag });
+  } catch (e) {
+    console.error('oppdrag-status error:', e);
+    activity.error(`Status-endring rad ${req.params.row} feilet: ${e.message}`);
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // --- Email scanning ---
 app.post('/api/scan-emails', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'simulert e-postskanning fullført');
   try {
     const { scanIncomingEmails } = require('./scanner');
     const result = await scanIncomingEmails();
@@ -27,6 +289,7 @@ app.post('/api/scan-emails', async (req, res) => {
 
 // --- IVIT scraping ---
 app.post('/api/process-ivit', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'simulert IVIT-scraping fullført');
   try {
     const { processIVITScraping } = require('./ivit');
     const result = await processIVITScraping();
@@ -37,8 +300,9 @@ app.post('/api/process-ivit', async (req, res) => {
   }
 });
 
-// --- Dashboard ---
+// --- Dashboard sheet write ---
 app.post('/api/update-dashboard', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'dashboard oppdatert (simulert)');
   try {
     const { updateDashboard } = require('./dashboard');
     await updateDashboard();
@@ -51,6 +315,7 @@ app.post('/api/update-dashboard', async (req, res) => {
 
 // --- Reminders ---
 app.post('/api/check-reminders', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'påminnelser sjekket (simulert)');
   try {
     const { checkReminders } = require('./reminders');
     const result = await checkReminders();
@@ -63,6 +328,7 @@ app.post('/api/check-reminders', async (req, res) => {
 
 // --- Weekly report ---
 app.post('/api/send-weekly-report', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'ukerapport simulert (ingen e-post sendt)');
   try {
     const { sendWeeklyReport } = require('./reminders');
     await sendWeeklyReport();
@@ -75,18 +341,24 @@ app.post('/api/send-weekly-report', async (req, res) => {
 
 // --- Send faktura ---
 app.post('/api/send-faktura', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'faktura-batch simulert (ingen e-post sendt)');
   try {
     const { sendFakturaTilRegnskap } = require('./oppdrag');
     const count = await sendFakturaTilRegnskap();
+    const { bustCache } = require('./data');
+    bustCache();
+    activity.faktura(`Faktura-batch sendt: ${count} oppdrag`, { by: req.session.user?.email, count });
     res.json({ success: true, count });
   } catch (e) {
     console.error('send-faktura error:', e);
+    activity.error(`Faktura-batch feilet: ${e.message}`);
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // --- Manual registration ---
 app.post('/api/register-oppdrag', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'oppdrag registrert (ikke lagret)');
   try {
     const { adresse, selger, telefon, epost, boligtype, rapporttype, areal, megler, merknad } = req.body;
     if (!adresse) {
@@ -96,15 +368,20 @@ app.post('/api/register-oppdrag', async (req, res) => {
     const oppdragsnr = await registerManualOppdrag({
       adresse, selger, telefon, epost, boligtype, rapporttype, areal, megler, merknad,
     });
+    const { bustCache } = require('./data');
+    bustCache();
+    activity.register(`Nytt manuelt oppdrag: ${oppdragsnr} — ${adresse}`, { by: req.session.user?.email, oppdragsnr });
     res.json({ success: true, oppdragsnr });
   } catch (e) {
     console.error('register-oppdrag error:', e);
+    activity.error(`Manuell registrering feilet: ${e.message}`);
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // --- Status change ---
 app.post('/api/status-change', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'status endret (ikke lagret)');
   try {
     const { row, status } = req.body;
     if (!row || !status) {
@@ -112,6 +389,8 @@ app.post('/api/status-change', async (req, res) => {
     }
     const { handleStatusChange } = require('./oppdrag');
     await handleStatusChange(row, status);
+    const { bustCache } = require('./data');
+    bustCache();
     res.json({ success: true });
   } catch (e) {
     console.error('status-change error:', e);
@@ -121,6 +400,7 @@ app.post('/api/status-change', async (req, res) => {
 
 // --- Recalculate price ---
 app.post('/api/recalculate-price', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'pris rekalkulert (ikke lagret)');
   try {
     const { row } = req.body;
     if (!row) {
@@ -128,6 +408,8 @@ app.post('/api/recalculate-price', async (req, res) => {
     }
     const { calculatePriceForRow } = require('./oppdrag');
     await calculatePriceForRow(row);
+    const { bustCache } = require('./data');
+    bustCache();
     res.json({ success: true });
   } catch (e) {
     console.error('recalculate-price error:', e);
@@ -137,6 +419,7 @@ app.post('/api/recalculate-price', async (req, res) => {
 
 // --- Recalculate travel ---
 app.post('/api/recalculate-travel', async (req, res) => {
+  if (config.demoMode) return demoOk(res, 'reisekostnad rekalkulert (ikke lagret)');
   try {
     const { row, address } = req.body;
     if (!row || !address) {
@@ -144,6 +427,8 @@ app.post('/api/recalculate-travel', async (req, res) => {
     }
     const { recalculateTravel } = require('./oppdrag');
     await recalculateTravel(row, address);
+    const { bustCache } = require('./data');
+    bustCache();
     res.json({ success: true });
   } catch (e) {
     console.error('recalculate-travel error:', e);
@@ -154,55 +439,13 @@ app.post('/api/recalculate-travel', async (req, res) => {
 // ============================================================
 // CRON JOBS
 // ============================================================
+// Schedules come from settings (Innstillinger-sheet, hot-reloadable via /api/settings PATCH).
+// Gated by WEBAPP_CRON_ENABLED + !DEMO_MODE inside cron-manager.
 
-// Scan emails every 5 minutes
-cron.schedule('*/5 * * * *', async () => {
-  try {
-    const { scanIncomingEmails } = require('./scanner');
-    await scanIncomingEmails();
-  } catch (e) {
-    console.error('Cron scan-emails error:', e.message);
-  }
-});
-
-// Check reminders every hour
-cron.schedule('0 * * * *', async () => {
-  try {
-    const { checkReminders } = require('./reminders');
-    await checkReminders();
-  } catch (e) {
-    console.error('Cron check-reminders error:', e.message);
-  }
-});
-
-// Update dashboard every hour
-cron.schedule('30 * * * *', async () => {
-  try {
-    const { updateDashboard } = require('./dashboard');
-    await updateDashboard();
-  } catch (e) {
-    console.error('Cron update-dashboard error:', e.message);
-  }
-});
-
-// Process IVIT scraping every 15 minutes
-cron.schedule('*/15 * * * *', async () => {
-  try {
-    const { processIVITScraping } = require('./ivit');
-    await processIVITScraping();
-  } catch (e) {
-    console.error('Cron process-ivit error:', e.message);
-  }
-});
-
-// Weekly report on Fridays at 16:00
-cron.schedule('0 16 * * 5', async () => {
-  try {
-    const { sendWeeklyReport } = require('./reminders');
-    await sendWeeklyReport();
-  } catch (e) {
-    console.error('Cron weekly-report error:', e.message);
-  }
+cronMgr.registerDefaults();
+// Apply initial schedule asynchronously (don't block server boot)
+cronMgr.applyScheduleFromSettings().catch(e => {
+  console.error('Initial cron registration failed:', e.message);
 });
 
 // ============================================================
@@ -212,7 +455,15 @@ cron.schedule('0 16 * * 5', async () => {
 const server = app.listen(config.port, () => {
   console.log(`Naava Takst webapp listening on port ${config.port}`);
   console.log(`Test mode: ${config.testMode}`);
-  console.log('Cron jobs: scan(5m), reminders(1h), dashboard(1h), ivit(15m), weekly(Fri 16:00)');
+  console.log(`Demo mode: ${config.demoMode}`);
+  console.log(`Allowed emails: ${config.allowedEmails.length} configured`);
+  if (config.webappCronEnabled && !config.demoMode) {
+    console.log('Cron jobs: scan(5m), reminders(1h), dashboard(1h), ivit(15m), weekly(Fri 16:00)');
+  } else if (config.webappCronEnabled && config.demoMode) {
+    console.log('Cron jobs: SUPPRESSED (DEMO_MODE=true overrides WEBAPP_CRON_ENABLED).');
+  } else {
+    console.log('Cron jobs: DISABLED (WEBAPP_CRON_ENABLED=false). Apps Script handles automation.');
+  }
 });
 
 async function shutdown(signal) {

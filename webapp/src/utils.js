@@ -97,6 +97,13 @@ function mapBoligtype(raw) {
   return 'Annet';
 }
 
+function substitute(template, data) {
+  return String(template || '').replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const v = data && data[key];
+    return v === undefined || v === null ? '' : String(v);
+  });
+}
+
 module.exports = {
   formatCurrency,
   getWeekNumber,
@@ -107,4 +114,5 @@ module.exports = {
   extractAddressFromHyperlink,
   classifyBoligBucket,
   mapBoligtype,
+  substitute,
 };
