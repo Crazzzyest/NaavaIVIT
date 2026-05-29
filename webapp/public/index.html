@@ -341,6 +341,23 @@
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+    /* iOS Safari auto-zooms inputs with font-size < 16px when focused.
+       Bump all form controls to 16px on touch-capable screens. */
+    @media (max-width: 900px) {
+      input[type="text"],
+      input[type="number"],
+      input[type="email"],
+      input[type="tel"],
+      input[type="date"],
+      input[type="time"],
+      input[type="search"],
+      input[type="password"],
+      textarea,
+      select {
+        font-size: 16px !important;
+      }
+    }
+
     @media (max-width: 900px) {
       .topnav { padding: 6px 8px; gap: 4px; flex-wrap: wrap; height: auto; min-height: 56px; }
       .topnav .logo { margin-right: 4px; font-size: 17px; }
