@@ -48,6 +48,19 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Public diagnostic — what OAuth callback are we configured to use?
+// Helps debug redirect_uri_mismatch without exposing secrets.
+app.get('/auth/debug', (req, res) => {
+  res.json({
+    loginOAuth_callbackUrl: config.loginOAuth.callbackUrl,
+    loginOAuth_clientId: config.loginOAuth.clientId
+      ? config.loginOAuth.clientId.slice(0, 20) + '…'
+      : '(not set)',
+    loginOAuth_clientSecret: config.loginOAuth.clientSecret ? '(set)' : '(not set)',
+    note: 'This is what webappen sender til Google som redirect_uri. Skal matche EKSAKT en URI i Google Cloud Console.',
+  });
+});
+
 app.get('/login', (req, res) => {
   if (req.session && req.session.user) return res.redirect('/');
   res.render('login', { error: req.query.error || null });
