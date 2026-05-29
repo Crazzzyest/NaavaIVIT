@@ -239,6 +239,21 @@
     .activity-log .log-entry .type-admin { background: #fff8e1; color: #ff8f00; }
     .activity-log .log-empty { padding: 40px; color: #aaa; text-align: center; font-size: 14px; }
 
+    /* Prisliste table */
+    .price-table { width: 100%; border-collapse: collapse; }
+    .price-table th, .price-table td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .price-table th { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; font-weight: 600; }
+    .price-table td input { width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 13px; font-family: inherit; background: transparent; transition: border 0.15s, background 0.15s; }
+    .price-table td input:hover { border-color: #e0e0e0; background: #fafafa; }
+    .price-table td input:focus { outline: none; border-color: #1a5c2a; background: white; box-shadow: 0 0 0 2px rgba(26,92,42,0.1); }
+    .price-table td input[type="number"] { text-align: right; }
+    .price-table td.prod-col { width: 70px; }
+    .price-table td.actions-col { width: 32px; text-align: center; }
+    .price-table .delete-btn { background: transparent; border: none; cursor: pointer; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
+    .price-table .delete-btn:hover { background: #fdecea; }
+    .price-toolbar { margin-top: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .price-toolbar .indicator { margin-left: auto; }
+
     .system-status { display: flex; gap: 12px; flex-wrap: wrap; }
     .system-status .chip { padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; }
     .system-status .chip.prod { background: #e8f5e9; color: #1a5c2a; }
@@ -557,6 +572,30 @@
       <h2>Mottakere</h2>
       <div class="section-hint">Hvem som mottar systemets e-poster. Allowed-emails (whitelist for innlogging) settes via env-variabel ALLOWED_EMAILS i .env og kan ikke endres herfra.</div>
       <div id="recipientsSection">Laster…</div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Prisliste</h2>
+      <div class="section-hint">Prisene brukes når et oppdrag opprettes eller endres. <strong>Tilstandsrapport pris</strong> = standard. <strong>m/markedsverdi pris</strong> = brukes når "Med markedsverdi" er huket av på oppdraget. Endringer trer i kraft umiddelbart for nye prisberegninger. Lagres i <code>Prisliste</code>-fanen i sheetet.</div>
+      <table class="price-table" id="priceTable">
+        <thead>
+          <tr>
+            <th>Kategori</th>
+            <th>Størrelse</th>
+            <th style="text-align:right">Pris (inkl. mva)</th>
+            <th style="text-align:right">m/markedsverdi (inkl. mva)</th>
+            <th>Prodnr</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="priceTableBody"><tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">Laster…</td></tr></tbody>
+      </table>
+      <div class="price-toolbar">
+        <button class="btn btn-outline" onclick="addPriceRow()">+ Legg til rad</button>
+        <button class="btn btn-outline" onclick="loadDefaultPrices()">Last inn standardpriser</button>
+        <button class="btn btn-primary" onclick="savePrices()" id="savePricesBtn">Lagre prisliste</button>
+        <span class="indicator" id="pricesIndicator"></span>
+      </div>
     </div>
 
     <div class="activity-log">
@@ -1338,7 +1377,105 @@
     let _adminRefresh = null;
 
     async function loadAdmin() {
-      await Promise.all([loadSettings(), loadActivity(), loadJobs(), loadSystemStatus()]);
+      await Promise.all([loadSettings(), loadActivity(), loadJobs(), loadSystemStatus(), loadPrices()]);
+    }
+
+    // ── Prisliste editor ──
+    let priceData = [];
+    let priceDefaults = [];
+
+    async function loadPrices() {
+      try {
+        const res = await fetch('/api/prisliste');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const d = await res.json();
+        if (!d.success) throw new Error(d.error);
+        priceData = d.rows || [];
+        priceDefaults = d.defaults || [];
+        renderPriceTable();
+      } catch (e) {
+        document.getElementById('priceTableBody').innerHTML =
+          `<tr><td colspan="6" style="text-align:center;color:#c62828;padding:20px;">Kunne ikke laste prisliste: ${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
+
+    function renderPriceTable() {
+      const tbody = document.getElementById('priceTableBody');
+      if (priceData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">Ingen rader. Klikk "Last inn standardpriser" eller "+ Legg til rad".</td></tr>';
+        return;
+      }
+      tbody.innerHTML = priceData.map((r, i) => `
+        <tr>
+          <td><input type="text" value="${escapeHtml(r.kategori || '')}" placeholder="Leilighet, Enebolig, Timesats…" oninput="updatePriceCell(${i}, 'kategori', this.value)"></td>
+          <td><input type="text" value="${escapeHtml(r.storrelse || '')}" placeholder="Under 80 m², (blank)…" oninput="updatePriceCell(${i}, 'storrelse', this.value)"></td>
+          <td><input type="number" value="${r.prisStandard || ''}" step="100" min="0" oninput="updatePriceCell(${i}, 'prisStandard', this.value)"></td>
+          <td><input type="number" value="${r.prisMarked || ''}" step="100" min="0" oninput="updatePriceCell(${i}, 'prisMarked', this.value)"></td>
+          <td class="prod-col"><input type="text" value="${escapeHtml(r.prodNr || '')}" oninput="updatePriceCell(${i}, 'prodNr', this.value)"></td>
+          <td class="actions-col"><button class="delete-btn" onclick="deletePriceRow(${i})" title="Slett rad">×</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function updatePriceCell(i, field, value) {
+      if (!priceData[i]) return;
+      if (field === 'prisStandard' || field === 'prisMarked') {
+        priceData[i][field] = parseFloat(value) || 0;
+      } else {
+        priceData[i][field] = value;
+      }
+    }
+
+    function addPriceRow() {
+      priceData.push({ kategori: '', storrelse: '', prisStandard: 0, prisMarked: 0, prodNr: '' });
+      renderPriceTable();
+      // Focus first input of new row
+      const tbody = document.getElementById('priceTableBody');
+      const lastRow = tbody.lastElementChild;
+      if (lastRow) {
+        const firstInput = lastRow.querySelector('input');
+        if (firstInput) firstInput.focus();
+      }
+    }
+
+    function deletePriceRow(i) {
+      const r = priceData[i];
+      const label = r.kategori || r.storrelse || 'denne raden';
+      if (!confirm(`Slett "${label}"?`)) return;
+      priceData.splice(i, 1);
+      renderPriceTable();
+    }
+
+    function loadDefaultPrices() {
+      if (priceData.length > 0 && !confirm('Erstatte nåværende prisliste med standardpriser? Du må fortsatt trykke "Lagre prisliste" etterpå.')) return;
+      priceData = priceDefaults.map(r => ({ ...r }));
+      renderPriceTable();
+    }
+
+    async function savePrices() {
+      const btn = document.getElementById('savePricesBtn');
+      const ind = document.getElementById('pricesIndicator');
+      btn.disabled = true;
+      ind.className = 'indicator saving';
+      ind.textContent = 'Lagrer…';
+      try {
+        const res = await fetch('/api/prisliste', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: priceData }),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const d = await res.json();
+        if (!d.success) throw new Error(d.error || 'Ukjent feil');
+        ind.className = 'indicator saved';
+        ind.textContent = d.demoMode ? 'Demo: simulert' : `✓ Lagret (${d.updated} rader)`;
+      } catch (e) {
+        ind.className = 'indicator error';
+        ind.textContent = 'Feil: ' + e.message;
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => { ind.className = 'indicator'; ind.textContent = ''; }, 4000);
+      }
     }
 
     function startAdminAutoRefresh() {

@@ -211,6 +211,39 @@ app.get('/api/activity', (req, res) => {
   res.json({ success: true, entries: activity.list(limit) });
 });
 
+// --- Prisliste ---
+app.get('/api/prisliste', async (req, res) => {
+  try {
+    const { getRows, DEFAULTS } = require('./prisliste');
+    const rows = await getRows();
+    res.json({ success: true, rows, defaults: DEFAULTS });
+  } catch (e) {
+    console.error('get-prisliste error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.put('/api/prisliste', async (req, res) => {
+  if (config.demoMode) {
+    activity.admin('Demo: prisliste oppdatert (ikke lagret)', { count: (req.body?.rows || []).length });
+    return demoOk(res, 'prisliste oppdatert (ikke lagret)');
+  }
+  try {
+    const rows = req.body && req.body.rows;
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ success: false, error: 'body must be { rows: [...] }' });
+    }
+    const { setRows } = require('./prisliste');
+    const result = await setRows(rows);
+    activity.admin(`Prisliste oppdatert: ${result.updated} rader`, { by: req.session.user?.email });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('put-prisliste error:', e);
+    activity.error(`Prisliste-lagring feilet: ${e.message}`);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // --- Cron job introspection ---
 app.get('/api/admin/jobs', (req, res) => {
   res.json({ success: true, jobs: cronMgr.listJobs() });
