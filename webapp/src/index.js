@@ -177,7 +177,23 @@ app.get('/api/me', (req, res) => {
 app.get('/api/settings', async (req, res) => {
   try {
     const data = await settingsModule.get();
-    res.json({ success: true, settings: data, schema: settingsModule.SCHEMA, defaults: settingsModule.DEFAULTS });
+    // Mask secret values — never send actual secrets to the client.
+    // The UI shows masked-input + placeholder "(satt)" if non-empty.
+    const safe = { ...data };
+    const masked = {};
+    for (const key of Object.keys(safe)) {
+      if (settingsModule.isSecretKey(key)) {
+        masked[key] = !!safe[key];
+        safe[key] = safe[key] ? '***' : '';
+      }
+    }
+    res.json({
+      success: true,
+      settings: safe,
+      schema: settingsModule.SCHEMA,
+      defaults: settingsModule.DEFAULTS,
+      secretsSet: masked,
+    });
   } catch (e) {
     console.error('get-settings error:', e);
     res.status(500).json({ success: false, error: e.message });
@@ -191,13 +207,22 @@ app.patch('/api/settings', async (req, res) => {
   }
   try {
     const updates = req.body || {};
-    const result = await settingsModule.patch(updates);
-    // Reapply cron schedules if any cron.* key changed
-    if (Object.keys(updates).some(k => k.startsWith('cron.'))) {
-      await cronMgr.applyScheduleFromSettings();
-      activity.admin('Cron-jobber re-registrert etter endring av tidsplan', { keys: Object.keys(updates).filter(k => k.startsWith('cron.')) });
+    // Strip out empty values for secret keys — prevents accidental wipe by
+    // submitting the masked '***' placeholder back as an empty/unchanged value.
+    const cleaned = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (settingsModule.isSecretKey(key)) {
+        if (!value || value === '***') continue; // skip — keep existing
+      }
+      cleaned[key] = value;
     }
-    activity.admin('Innstillinger oppdatert', { updated: Object.keys(updates) });
+    const result = await settingsModule.patch(cleaned);
+    // Reapply cron schedules if any cron.* key changed
+    if (Object.keys(cleaned).some(k => k.startsWith('cron.'))) {
+      await cronMgr.applyScheduleFromSettings();
+      activity.admin('Cron-jobber re-registrert etter endring av tidsplan', { keys: Object.keys(cleaned).filter(k => k.startsWith('cron.')) });
+    }
+    activity.admin('Innstillinger oppdatert', { updated: Object.keys(cleaned) });
     res.json({ success: true, ...result });
   } catch (e) {
     console.error('patch-settings error:', e);

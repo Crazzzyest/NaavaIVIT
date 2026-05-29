@@ -1512,12 +1512,15 @@
       }
     }
 
+    let currentSecretsSet = {};
+
     async function loadSettings() {
       try {
         const res = await fetch('/api/settings');
         if (res.status === 401) { window.location.href = '/login'; return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
+        currentSecretsSet = data.secretsSet || {};
         renderSettings(data.settings, data.schema);
       } catch (e) {
         showToast('Kunne ikke laste innstillinger: ' + e.message, 'error');
@@ -1643,18 +1646,24 @@
       // --- IVIT credentials ---
       const ivitKeys = ['ivit.username', 'ivit.password'];
       let ivitHtml = '';
+      const secretsSet = currentSecretsSet || {};
       for (const key of ivitKeys) {
         const sp = schema[key] || {};
-        const isPassword = sp.type === 'password';
+        const isSecret = sp.secret;
         const value = s[key] || '';
-        // For password: show masked input + a toggle eye icon
-        if (isPassword) {
-          const masked = value ? '••••••••' : '';
+        if (isSecret) {
+          // Server sent '***' or empty. Show empty input with placeholder
+          // indicating whether a value is stored.
+          const isSet = !!secretsSet[key];
+          const placeholder = isSet ? '••••••••• (lagret, kryptert)' : '(ikke satt)';
           const ctrl = `
-            <input type="password" data-setting="${key}" value="${escapeHtml(value)}" autocomplete="new-password" placeholder="${masked || '(ikke satt)'}">
-            <button type="button" class="btn btn-outline" style="padding: 5px 10px; font-size: 12px;" onclick="togglePasswordVisibility('${key}', this)">Vis</button>
+            <input type="password" data-setting="${key}" value="" autocomplete="new-password" placeholder="${placeholder}">
+            <button type="button" class="btn btn-outline" style="padding: 5px 10px; font-size: 12px;" onclick="togglePasswordVisibility('${key}', this)">Vis ny</button>
           `;
-          ivitHtml += adminRow(key, sp.label || key, '', ctrl);
+          const hint = isSet
+            ? 'Skriv inn nytt passord for å bytte. Tomt felt = behold eksisterende.'
+            : 'Ingen passord lagret. Skriv inn IVIT-passordet ditt.';
+          ivitHtml += adminFullRow(key, sp.label || key, hint, ctrl);
         } else {
           const ctrl = `<input type="text" data-setting="${key}" value="${escapeHtml(value)}" autocomplete="off">`;
           ivitHtml += adminRow(key, sp.label || key, '', ctrl);

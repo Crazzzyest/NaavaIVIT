@@ -111,8 +111,12 @@ const SCHEMA = {
   'recipients.testSender':          { type: 'email', label: 'Test-avsender (kun TEST_MODE)' },
 
   'ivit.username':                  { type: 'text', label: 'IVIT brukernavn' },
-  'ivit.password':                  { type: 'password', label: 'IVIT passord' },
+  'ivit.password':                  { type: 'password', label: 'IVIT passord', secret: true },
 };
+
+function isSecretKey(key) {
+  return !!(SCHEMA[key] && SCHEMA[key].secret);
+}
 
 // ============================================================
 // CACHE
@@ -156,14 +160,26 @@ async function loadFromSheet() {
     return { ...DEFAULTS };
   }
 
+  const crypto = require('./crypto');
   const merged = { ...DEFAULTS };
   if (rows && rows.length >= 2) {
     for (let i = 1; i < rows.length; i++) {
       const key = String(rows[i][0] || '').trim();
       if (!key || !(key in DEFAULTS)) continue;
-      const raw = rows[i][1];
+      let raw = rows[i][1];
       if (raw === '' || raw === null || raw === undefined) continue;
       const spec = SCHEMA[key];
+
+      // Decrypt secret values before coercion
+      if (isSecretKey(key)) {
+        try {
+          raw = crypto.decrypt(raw);
+        } catch (e) {
+          console.error(`Could not decrypt ${key}: ${e.message}`);
+          continue;
+        }
+      }
+
       const coerced = coerce(raw, spec ? spec.type : 'text');
       if (coerced !== null) merged[key] = coerced;
     }
@@ -230,9 +246,16 @@ async function patch(updates) {
     await google.appendRow(SETTINGS_SHEET, ['Nøkkel', 'Verdi']);
   }
 
+  const crypto = require('./crypto');
   for (const [key, value] of Object.entries(updates || {})) {
     if (!(key in DEFAULTS)) continue; // ignore unknown keys
-    const stringVal = stringify(value);
+    let stringVal = stringify(value);
+
+    // Encrypt secret values before writing to sheet
+    if (isSecretKey(key) && stringVal) {
+      stringVal = crypto.encrypt(stringVal);
+    }
+
     if (keyToRow[key]) {
       await google.updateCell(SETTINGS_SHEET, keyToRow[key], 2, stringVal);
     } else {
@@ -253,6 +276,7 @@ module.exports = {
   getCached,
   patch,
   bustCache,
+  isSecretKey,
   DEFAULTS,
   SCHEMA,
   SETTINGS_SHEET,

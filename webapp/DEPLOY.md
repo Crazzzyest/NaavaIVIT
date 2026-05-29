@@ -43,6 +43,16 @@ LOGIN_OAUTH_CALLBACK_URL=https://<din-app>.sliplane.app/auth/google/callback   #
 # ── Session ──
 SESSION_SECRET=<generer ny: openssl rand -hex 32>   # ⚠️ IKKE bruk lokal verdi
 
+# ── Master encryption key (krypterer secrets i Innstillinger-sheet) ──
+# Generer med: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# eller: openssl rand -hex 32
+# 64 hex-tegn = 32 bytes = 256 bit. MÅ være satt for at IVIT-passord skal
+# lagres kryptert. Hvis ikke satt: passord skrives i klartekst med en advarsel.
+# Endre ALDRI denne etter at du har lagret krypterte verdier — det gjør dem
+# uleselige. Hvis du må rotere: dekrypter først (med gammel key), lagre i
+# klartekst, sett ny key, lagre på nytt.
+MASTER_ENCRYPTION_KEY=<generer ny — IKKE bruk lokal>
+
 # ── Allowed users ──
 ALLOWED_EMAILS=jacob@naava.no,afki@naava.no,edsongreistad99@gmail.com
 
