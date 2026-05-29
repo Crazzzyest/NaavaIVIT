@@ -48,17 +48,49 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Public diagnostic — what OAuth callback are we configured to use?
-// Helps debug redirect_uri_mismatch without exposing secrets.
-app.get('/auth/debug', (req, res) => {
-  res.json({
-    loginOAuth_callbackUrl: config.loginOAuth.callbackUrl,
-    loginOAuth_clientId: config.loginOAuth.clientId
-      ? config.loginOAuth.clientId.slice(0, 20) + '…'
-      : '(not set)',
-    loginOAuth_clientSecret: config.loginOAuth.clientSecret ? '(set)' : '(not set)',
-    note: 'This is what webappen sender til Google som redirect_uri. Skal matche EKSAKT en URI i Google Cloud Console.',
-  });
+// Public diagnostic — shows which OAuth config is loaded without exposing secrets.
+app.get('/auth/debug', async (req, res) => {
+  const out = {
+    login_oauth: {
+      callbackUrl: config.loginOAuth.callbackUrl,
+      clientId_prefix: config.loginOAuth.clientId
+        ? config.loginOAuth.clientId.slice(0, 25) + '…'
+        : '(not set)',
+      clientSecret_set: !!config.loginOAuth.clientSecret,
+    },
+    google_service_account: {
+      clientId_prefix: config.google.clientId
+        ? config.google.clientId.slice(0, 25) + '…'
+        : '(not set)',
+      clientSecret_set: !!config.google.clientSecret,
+      refreshToken_set: !!config.google.refreshToken,
+      refreshToken_length: config.google.refreshToken ? config.google.refreshToken.length : 0,
+      access_token_test: null,
+    },
+    modes: {
+      testMode: config.testMode,
+      demoMode: config.demoMode,
+      webappCronEnabled: config.webappCronEnabled,
+      nodeEnv: process.env.NODE_ENV,
+    },
+  };
+
+  // Try to actually exchange the refresh token for an access token
+  if (config.google.refreshToken && config.google.clientId && config.google.clientSecret) {
+    try {
+      const { google } = require('googleapis');
+      const auth = new google.auth.OAuth2(config.google.clientId, config.google.clientSecret);
+      auth.setCredentials({ refresh_token: config.google.refreshToken });
+      const t = await auth.getAccessToken();
+      out.google_service_account.access_token_test = t && t.token ? 'OK — refresh-token virker' : 'FAILED — no token returned';
+    } catch (e) {
+      out.google_service_account.access_token_test = `FAILED — ${e.message}`;
+    }
+  } else {
+    out.google_service_account.access_token_test = 'SKIPPED — missing creds';
+  }
+
+  res.json(out);
 });
 
 app.get('/login', (req, res) => {
