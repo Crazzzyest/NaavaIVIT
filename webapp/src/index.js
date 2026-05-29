@@ -53,7 +53,10 @@ app.get('/login', (req, res) => {
   res.render('login', { error: req.query.error || null });
 });
 
-app.get('/auth/google', passport.authenticate('google', { scope: ['openid', 'email', 'profile'] }));
+app.get('/auth/google', passport.authenticate('google', {
+  scope: ['openid', 'email', 'profile'],
+  prompt: 'select_account',
+}));
 
 app.get('/auth/google/callback', (req, res, next) => {
   passport.authenticate('google', (err, user, info) => {
