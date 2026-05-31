@@ -101,7 +101,6 @@ async function scanIncomingEmails() {
       if (isIVIT && (msg.body || '').includes('Jacob Engholm Holen')) {
         console.log('  Skipping IVIT - contains own signature');
         await google.addLabelToThread(threadInfo.id, labelId);
-        await google.markThreadRead(threadInfo.id);
         continue;
       }
 
@@ -114,7 +113,6 @@ async function scanIncomingEmails() {
         if (!parsed) {
           console.log('  AI assessed: not relevant');
           await google.addLabelToThread(threadInfo.id, labelId);
-          await google.markThreadRead(threadInfo.id);
           continue;
         }
         console.log(`  AI assessed: relevant - ${parsed.oppdragstype}`);
@@ -129,7 +127,8 @@ async function scanIncomingEmails() {
       processed++;
 
       await google.addLabelToThread(threadInfo.id, labelId);
-      await google.markThreadRead(threadInfo.id);
+      // Intentionally NOT marking as read — Jacob vil se uleste e-poster så
+      // han får med seg nye. "Takst-Behandlet"-labelen hindrer dobbel-prosessering.
       console.log('  Done with thread');
 
     } catch (err) {
