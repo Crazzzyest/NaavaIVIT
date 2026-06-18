@@ -1172,12 +1172,14 @@
         ${editField('Klokkeslett (hh:mm)', 'befaringKl', o.befaringKl, { placeholder: 'hh:mm' })}
       </div></div>`);
 
-      // Pris (read-only — autocalculated)
-      sections.push(`<div class="modal-section"><h3>Pris <span style="font-size:11px;color:#999;font-weight:normal">(beregnes automatisk)</span></h3><div class="field-grid">
-        ${field('Pris inkl. mva', fmt(o.prisInkl), { cls: 'price-big' })}
-        ${field('Pris eks. mva', fmt(o.prisEks))}
+      // Pris — auto-beregnes fra boligtype/areal/Prisliste, men kan overstyres.
+      // Endring av boligtype/areal/markedsverdi/tilleggsbygg/timer regner ut på
+      // nytt; direkte redigering av pris eks/inkl overstyrer.
+      sections.push(`<div class="modal-section"><h3>Pris <span style="font-size:11px;color:#999;font-weight:normal">(auto-beregnes, men kan overstyres)</span></h3><div class="field-grid">
+        ${editField('Pris inkl. mva (kr)', 'prisInkl', o.prisInkl, { type: 'number' })}
+        ${editField('Pris eks. mva (kr)', 'prisEks', o.prisEks, { type: 'number' })}
         ${field('MVA', fmt(o.mvaBelop))}
-        ${field('Produktnummer', o.produktnummer)}
+        ${editField('Produktnummer', 'produktnummer', o.produktnummer)}
         ${editField('Timer', 'timer', o.timer)}
       </div></div>`);
 

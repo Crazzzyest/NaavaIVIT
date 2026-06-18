@@ -248,6 +248,9 @@ const PATCHABLE_FIELDS = {
   reiseEks:            { col: COL.REISE_EKS,            kind: 'number' },
   reiseInkl:           { col: COL.REISE_INKL,           kind: 'number' },
   avstandKm:           { col: COL.AVSTAND_KM,           kind: 'text'   },
+  prisInkl:            { col: COL.PRIS_INKL,            kind: 'number' },
+  prisEks:             { col: COL.PRIS_EKS,             kind: 'number' },
+  produktnummer:       { col: COL.PRODUKTNUMMER,        kind: 'text'   },
   scanIvit:            { col: COL.SCAN_IVIT,           kind: 'boolean' },
   kanFaktureres:       { col: COL.KAN_FAKTURERES,      kind: 'boolean' },
   // status is handled separately (routes through handleStatusChange)
@@ -319,6 +322,29 @@ async function patchOppdrag(rowNum, partial) {
     touchedReiseSync = true;
   }
 
+  // Manual price override: sync eks/inkl/mva (mirrors auto-calc rounding).
+  // Editing prisInkl fills prisEks (÷ 1+mva) + mvaBelop; editing prisEks fills
+  // prisInkl (× 1+mva) + mvaBelop. Does NOT run Prisliste recalc, so a manual
+  // price sticks until boligtype/areal/markedsverdi/tilleggsbygg/timer changes.
+  let touchedPrisSync = false;
+  if ('prisInkl' in applied && !('prisEks' in applied)) {
+    const inkl = Number(applied.prisInkl) || 0;
+    const eks = Math.round(inkl / mva);
+    await google.updateCells(config.sheet.name, rowNum, [
+      { col: COL.PRIS_EKS, value: eks },
+      { col: COL.MVA_BELOP, value: inkl - eks },
+    ]);
+    touchedPrisSync = true;
+  } else if ('prisEks' in applied && !('prisInkl' in applied)) {
+    const eks = Number(applied.prisEks) || 0;
+    const inkl = Math.round(eks * mva);
+    await google.updateCells(config.sheet.name, rowNum, [
+      { col: COL.PRIS_INKL, value: inkl },
+      { col: COL.MVA_BELOP, value: inkl - eks },
+    ]);
+    touchedPrisSync = true;
+  }
+
   // Side effects
   if (touchedPricing) {
     const { calculatePriceForRow } = require('./oppdrag');
@@ -349,7 +375,7 @@ async function patchOppdrag(rowNum, partial) {
   }
 
   bustCache();
-  return { updated: applied, touched: { pricing: touchedPricing, travel: touchedTravel || touchedReiseSync, befaring: touchedBefaring } };
+  return { updated: applied, touched: { pricing: touchedPricing || touchedPrisSync, travel: touchedTravel || touchedReiseSync, befaring: touchedBefaring } };
 }
 
 async function getDashboardStats() {
