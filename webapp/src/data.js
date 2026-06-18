@@ -245,6 +245,9 @@ const PATCHABLE_FIELDS = {
   befaringKl:          { col: COL.BEFARING_KL,         kind: 'text' },
   sumFergeBom:         { col: COL.SUM_FERGE_BOM,       kind: 'number' },
   antallDeleReise:     { col: COL.ANTALL_DELE_REISE,   kind: 'number' },
+  reiseEks:            { col: COL.REISE_EKS,            kind: 'number' },
+  reiseInkl:           { col: COL.REISE_INKL,           kind: 'number' },
+  avstandKm:           { col: COL.AVSTAND_KM,           kind: 'text'   },
   scanIvit:            { col: COL.SCAN_IVIT,           kind: 'boolean' },
   kanFaktureres:       { col: COL.KAN_FAKTURERES,      kind: 'boolean' },
   // status is handled separately (routes through handleStatusChange)
@@ -252,8 +255,9 @@ const PATCHABLE_FIELDS = {
 
 // Fields that trigger price recalculation
 const PRICING_FIELDS = new Set(['boligtype', 'areal', 'antallTilleggsbygg', 'medMarkedsverdi', 'rapporttype', 'timer']);
-// Fields that trigger travel cost recalc
-const TRAVEL_FIELDS = new Set(['sumFergeBom', 'antallDeleReise']);
+// Fields that trigger travel cost recalc (km-based). Editing reiseEks/reiseInkl
+// directly is NOT here — those are manual overrides that should stick.
+const TRAVEL_FIELDS = new Set(['sumFergeBom', 'antallDeleReise', 'avstandKm']);
 // Fields that trigger befaring booked auto-status
 const BEFARING_FIELDS = new Set(['befaringDato', 'befaringKl']);
 
@@ -295,6 +299,26 @@ async function patchOppdrag(rowNum, partial) {
 
   await google.updateCells(config.sheet.name, rowNum, updates);
 
+  // Manual reisekost override: sync the other MVA half (mirrors Apps Script).
+  // Editing reiseEks fills reiseInkl (× 1+mva); editing reiseInkl fills reiseEks
+  // (÷ 1+mva). Does NOT trigger the km-based recalc, so a manual value sticks
+  // until the user changes km/bom/address.
+  const mva = 1 + config.mvaRate;
+  let touchedReiseSync = false;
+  if ('reiseEks' in applied && !('reiseInkl' in applied)) {
+    const eks = Number(applied.reiseEks) || 0;
+    await google.updateCells(config.sheet.name, rowNum, [
+      { col: COL.REISE_INKL, value: Math.round(eks * mva) },
+    ]);
+    touchedReiseSync = true;
+  } else if ('reiseInkl' in applied && !('reiseEks' in applied)) {
+    const inkl = Number(applied.reiseInkl) || 0;
+    await google.updateCells(config.sheet.name, rowNum, [
+      { col: COL.REISE_EKS, value: Math.round(inkl / mva) },
+    ]);
+    touchedReiseSync = true;
+  }
+
   // Side effects
   if (touchedPricing) {
     const { calculatePriceForRow } = require('./oppdrag');
@@ -325,7 +349,7 @@ async function patchOppdrag(rowNum, partial) {
   }
 
   bustCache();
-  return { updated: applied, touched: { pricing: touchedPricing, travel: touchedTravel, befaring: touchedBefaring } };
+  return { updated: applied, touched: { pricing: touchedPricing, travel: touchedTravel || touchedReiseSync, befaring: touchedBefaring } };
 }
 
 async function getDashboardStats() {

@@ -1181,11 +1181,12 @@
         ${editField('Timer', 'timer', o.timer)}
       </div></div>`);
 
-      // Reise
-      sections.push(`<div class="modal-section"><h3>Reise</h3><div class="field-grid">
-        ${field('Avstand t/r', o.avstandKm ? String(o.avstandKm).replace(/\s*km\s*$/i, '') + ' km' : '')}
-        ${field('Reise eks. mva', fmt(o.reiseEks))}
-        ${field('Reise inkl. mva', fmt(o.reiseInkl))}
+      // Reise — alle felt redigerbare. Endring av avstand/ferge/bom regner ut
+      // reisekost automatisk; direkte redigering av reise eks/inkl overstyrer.
+      sections.push(`<div class="modal-section"><h3>Reise <span style="font-size:11px;color:#999;font-weight:normal">(auto-beregnes, men kan overstyres)</span></h3><div class="field-grid">
+        ${editField('Avstand t/r (km)', 'avstandKm', String(o.avstandKm || '').replace(/\s*km\s*$/i, ''), { type: 'number' })}
+        ${editField('Reise eks. mva (kr)', 'reiseEks', o.reiseEks, { type: 'number' })}
+        ${editField('Reise inkl. mva (kr)', 'reiseInkl', o.reiseInkl, { type: 'number' })}
         ${editField('Ferge / bom', 'sumFergeBom', o.sumFergeBom, { type: 'number' })}
         ${editField('Antall som deler reise', 'antallDeleReise', o.antallDeleReise, { type: 'number' })}
       </div></div>`);
