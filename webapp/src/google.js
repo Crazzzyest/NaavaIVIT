@@ -32,7 +32,7 @@ function getGmail() {
 async function getSheetData(sheetName) {
   const res = await getSheets().spreadsheets.values.get({
     spreadsheetId: config.sheet.id,
-    range: `${sheetName}!A:AN`,
+    range: `${sheetName}!A:AQ`,
   });
   return res.data.values || [];
 }
@@ -40,7 +40,7 @@ async function getSheetData(sheetName) {
 async function appendRow(sheetName, row) {
   await getSheets().spreadsheets.values.append({
     spreadsheetId: config.sheet.id,
-    range: `${sheetName}!A:AN`,
+    range: `${sheetName}!A:AQ`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [row] },
   });

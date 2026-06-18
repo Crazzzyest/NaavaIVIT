@@ -18,6 +18,18 @@ function buildFakturaEmail(rowData, datoStr) {
   const reiseEks = parseFloat(rowData[COL.REISE_EKS - 1]) || 0;
   const kommentarRegnskap = String(rowData[COL.KOMMENTAR_REGNSKAP - 1] || '').trim();
 
+  // Alternativ fakturamottaker (hvis annen enn megler).
+  // cleanFm: strip stray checkbox leftovers ("TRUE"/"FALSE") from text columns.
+  const cleanFm = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    return (s === 'TRUE' || s === 'FALSE') ? '' : s;
+  };
+  const fmNavn = cleanFm(rowData[COL.FAKTURAMOTAKER - 1]);
+  const fmAdresse = cleanFm(rowData[COL.FAKTURAMOTAKER_ADRESSE - 1]);
+  const fmEpost = cleanFm(rowData[COL.FAKTURAMOTAKER_EPOST - 1]);
+  const fmInfo = cleanFm(rowData[COL.FAKTURAMOTAKER_INFO - 1]);
+  const harAltFakturamottaker = !!(fmAdresse || fmEpost || fmInfo);
+
   let gate = adresseFull;
   let postnr = '';
   let poststed = '';
@@ -55,6 +67,18 @@ function buildFakturaEmail(rowData, datoStr) {
   html += `<tr><td style="color:#666;">5.</td><td style="font-weight:bold;">Postnr.:</td><td>${postnr}</td></tr>`;
   html += `<tr><td style="color:#666;">6.</td><td style="font-weight:bold;">Poststed:</td><td>${poststed}</td></tr>`;
   html += '</table>';
+
+  // Fakturamottaker (vises kun hvis annen enn megler er oppgitt)
+  if (harAltFakturamottaker) {
+    html += '<div style="background-color:#e8f0fe; border-left:5px solid #1a5c2a; padding:15px; margin-top:25px; border-radius:4px;">';
+    html += '<strong style="display:block; margin-bottom:8px; font-size:15px; color:#1a5c2a;">⚑ Faktura sendes til (annen enn megler):</strong>';
+    html += '<table style="width:100%; border-collapse:collapse; line-height:1.7;">';
+    if (fmNavn)    html += `<tr><td style="width:140px; font-weight:bold;">Mottaker:</td><td>${fmNavn}</td></tr>`;
+    if (fmAdresse) html += `<tr><td style="font-weight:bold;">Adresse:</td><td>${fmAdresse}</td></tr>`;
+    if (fmEpost)   html += `<tr><td style="font-weight:bold;">E-post:</td><td>${fmEpost}</td></tr>`;
+    if (fmInfo)    html += `<tr><td style="font-weight:bold;">Fakturainfo:</td><td>${fmInfo}</td></tr>`;
+    html += '</table></div>';
+  }
 
   // Faktura
   html += '<h3 style="color:#1a5c2a; border-bottom:1px solid #ddd; padding-bottom:5px; margin-top:30px;">Faktura</h3>';

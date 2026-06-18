@@ -56,6 +56,14 @@ async function getRowsCached() {
   return rows;
 }
 
+// Text columns can pick up stray checkbox values ("TRUE"/"FALSE") when columns
+// are inserted next to a checkbox column in the sheet. Treat those as empty.
+function cleanFreeText(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s === 'TRUE' || s === 'FALSE') return '';
+  return s;
+}
+
 function projectRow(row, rowNum) {
   return {
     rowNum,
@@ -99,6 +107,9 @@ function projectRow(row, rowNum) {
     produktnummer: row[COL.PRODUKTNUMMER - 1] || '',
     kommentarRegnskap: row[COL.KOMMENTAR_REGNSKAP - 1] || '',
     kansellert: row[COL.KANSELLERT - 1] === true || row[COL.KANSELLERT - 1] === 'TRUE',
+    fakturamotakerAdresse: cleanFreeText(row[COL.FAKTURAMOTAKER_ADRESSE - 1]),
+    fakturamotakerEpost: cleanFreeText(row[COL.FAKTURAMOTAKER_EPOST - 1]),
+    fakturamotakerInfo: cleanFreeText(row[COL.FAKTURAMOTAKER_INFO - 1]),
   };
 }
 
@@ -225,6 +236,9 @@ const PATCHABLE_FIELDS = {
   fakturaRef:          { col: COL.FAKTURA_REF,         kind: 'text' },
   fakturaSendesTil:    { col: COL.FAKTURA_SENDES_TIL,  kind: 'text' },
   fakturamotaker:      { col: COL.FAKTURAMOTAKER,      kind: 'text' },
+  fakturamotakerAdresse: { col: COL.FAKTURAMOTAKER_ADRESSE, kind: 'text' },
+  fakturamotakerEpost:   { col: COL.FAKTURAMOTAKER_EPOST,   kind: 'text' },
+  fakturamotakerInfo:    { col: COL.FAKTURAMOTAKER_INFO,    kind: 'text' },
   notater:             { col: COL.NOTATER,             kind: 'text' },
   kommentarRegnskap:   { col: COL.KOMMENTAR_REGNSKAP,  kind: 'text' },
   befaringDato:        { col: COL.BEFARING_DATO,       kind: 'text' },
