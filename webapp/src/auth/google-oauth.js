@@ -1,7 +1,7 @@
 const passport = require('passport');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 const config = require('../config');
-const { isAllowed } = require('./whitelist');
+const { isAllowed, roleFor } = require('./whitelist');
 
 function configurePassport() {
   if (!config.loginOAuth.clientId || !config.loginOAuth.clientSecret) {
@@ -23,6 +23,7 @@ function configurePassport() {
         email,
         name: profile.displayName || email,
         picture: profile.photos && profile.photos[0] && profile.photos[0].value || null,
+        role: roleFor(email),
       });
     },
   ));

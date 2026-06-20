@@ -137,6 +137,87 @@ function buildFakturaEmail(rowData, datoStr) {
   return html;
 }
 
+// Plain-text faktura block for pasting into PowerOffice. Mirrors the email
+// layout (Kunde, Faktura, Produkter) but as copy-friendly text.
+function buildFakturaText(rowData) {
+  const oppdragsnr = rowData[COL.OPPDRAGSNR - 1] || '';
+  const adresseFull = extractAddressFromHyperlink(rowData[COL.ADRESSE - 1]);
+  const selger = rowData[COL.SELGER - 1] || '';
+  const selgerTlf = rowData[COL.SELGER_TLF - 1] || '';
+  const selgerEpost = rowData[COL.SELGER_EPOST - 1] || '';
+  const megler = rowData[COL.MEGLER - 1] || '';
+  const meglerEpost = rowData[COL.MEGLER_EPOST - 1] || '';
+  const fakturaRef = rowData[COL.FAKTURA_REF - 1] || '';
+  const fakturaTil = rowData[COL.FAKTURA_SENDES_TIL - 1] || '';
+  const rapporttype = rowData[COL.RAPPORTTYPE - 1] || rowData[COL.OPPDRAGSTYPE - 1] || 'Oppdrag';
+  const prisEks = parseFloat(rowData[COL.PRIS_EKS - 1]) || 0;
+  const reiseEks = parseFloat(rowData[COL.REISE_EKS - 1]) || 0;
+
+  let gate = adresseFull, postnr = '', poststed = '';
+  const m = adresseFull.match(/(.+?)(?:,\s*|\s+)(\d{4})\s+(.+)/);
+  if (m) { gate = m[1].trim(); postnr = m[2].trim(); poststed = m[3].trim(); }
+
+  const cleanFm = (v) => { const s = String(v == null ? '' : v).trim(); return (s === 'TRUE' || s === 'FALSE') ? '' : s; };
+  const fmNavn = cleanFm(rowData[COL.FAKTURAMOTAKER - 1]);
+  const fmAdresse = cleanFm(rowData[COL.FAKTURAMOTAKER_ADRESSE - 1]);
+  const fmEpost = cleanFm(rowData[COL.FAKTURAMOTAKER_EPOST - 1]);
+  const fmInfo = cleanFm(rowData[COL.FAKTURAMOTAKER_INFO - 1]);
+  const harAltFm = !!(fmAdresse || fmEpost || fmInfo);
+
+  const isMegler = fakturaTil && selger && !fakturaTil.toLowerCase().includes(selger.toLowerCase());
+  const kundeNavn = fakturaTil || selger || 'Ikke oppgitt';
+  const kundeEpost = (isMegler && meglerEpost) ? meglerEpost : (selgerEpost || meglerEpost || '');
+  const kundeRef = megler || kundeNavn;
+
+  // Products
+  const totalEks = prisEks;
+  const inklMarked = rowData[COL.MED_MARKEDSVERDI - 1] === true || rowData[COL.MED_MARKEDSVERDI - 1] === 'TRUE';
+  const antallTillegg = parseInt(rowData[COL.ANTALL_TILLEGGSBYGG - 1]) || 0;
+  const boligtype = rowData[COL.BOLIGTYPE - 1] || '';
+  const prodNrRaw = String(rowData[COL.PRODUKTNUMMER - 1] || '');
+  const baseProd = prodNrRaw.split(',')[0].trim();
+  const markedProd = prodNrRaw.includes(',') ? prodNrRaw.split(',')[1].trim() : '9';
+  let markedEks = (inklMarked && boligtype !== 'Frittstående bygg') ? (2000 / 1.25) : 0;
+  let tilleggEks = (antallTillegg * 1250) / 1.25;
+  let baseEks = totalEks - markedEks - tilleggEks;
+  if (baseEks < 0) { baseEks = totalEks; markedEks = 0; tilleggEks = 0; }
+
+  const kr = (n) => Math.round(n).toLocaleString('nb-NO') + ' kr';
+  const L = [];
+  L.push(`OPPDRAG: ${oppdragsnr}`);
+  L.push('');
+  L.push('KUNDE');
+  L.push(`  Navn/Firma:  ${kundeNavn}`);
+  L.push(`  Telefon:     ${selgerTlf}`);
+  L.push(`  E-post:      ${kundeEpost}`);
+  L.push(`  Adresse:     ${gate}`);
+  L.push(`  Postnr:      ${postnr}`);
+  L.push(`  Poststed:    ${poststed}`);
+  if (harAltFm) {
+    L.push('');
+    L.push('FAKTURA SENDES TIL (annen enn megler)');
+    if (fmNavn)    L.push(`  Mottaker:    ${fmNavn}`);
+    if (fmAdresse) L.push(`  Adresse:     ${fmAdresse}`);
+    if (fmEpost)   L.push(`  E-post:      ${fmEpost}`);
+    if (fmInfo)    L.push(`  Fakturainfo: ${fmInfo}`);
+  }
+  L.push('');
+  L.push('FAKTURA');
+  L.push(`  Kundens referanse: ${kundeRef}`);
+  L.push(`  PO-/Ordrenr:       ${fakturaRef || '-'}`);
+  L.push(`  Eiendom eier:      ${selger}`);
+  L.push(`  Eiendom adresse:   ${gate}`);
+  L.push(`  Postnr + poststed: ${postnr ? postnr + ' ' + poststed : poststed}`);
+  L.push('');
+  L.push('PRODUKTER (pris eks. mva)');
+  L.push(`  ${baseProd || '-'}\t${rapporttype}${boligtype ? ' - ' + boligtype : ''}\t${kr(baseEks)}`);
+  if (markedEks > 0) L.push(`  ${markedProd}\tTilstandsrapport markedsverdi\t${kr(markedEks)}`);
+  if (tilleggEks > 0) L.push(`  \tTilleggsbygg (${antallTillegg} stk)\t${kr(tilleggEks)}`);
+  if (reiseEks > 0) L.push(`  \tReisekostnad (inkl. evt bom/ferge)\t${kr(reiseEks)}`);
+  L.push(`  TOTAL EKS. MVA: ${kr(totalEks + reiseEks)}`);
+  return L.join('\n');
+}
+
 function buildBefaringEmail(adresse, dato, tid, selgerNavn, oppdragstype, templates = {}) {
   const kundeNavn = selgerNavn || 'kunde';
   const intro = templates.intro || 'Vi bekrefter herved avtalt befaring på følgende eiendom:';
@@ -248,6 +329,7 @@ function buildWeeklyReportHtml(fakturerbare, fakturerte, ventende, totals) {
 
 module.exports = {
   buildFakturaEmail,
+  buildFakturaText,
   buildBefaringEmail,
   buildNewOppdragEmail,
   buildWeeklyReportHtml,

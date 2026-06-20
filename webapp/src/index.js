@@ -134,7 +134,8 @@ app.get('/auth/logout', (req, res) => {
 if (process.env.NODE_ENV !== 'production' && process.env.DEV_LOGIN_ENABLED === 'true') {
   app.get('/auth/dev-login', (req, res) => {
     const email = (req.query.email || config.allowedEmails[0] || 'dev@example.com').toLowerCase();
-    req.session.user = { email, name: 'Dev User', picture: null };
+    const { roleFor } = require('./auth/whitelist');
+    req.session.user = { email, name: 'Dev User', picture: null, role: roleFor(email) };
     res.redirect('/');
   });
   console.log('DEV LOGIN ENABLED: /auth/dev-login is active. NEVER set this in production.');
@@ -145,6 +146,16 @@ if (process.env.NODE_ENV !== 'production' && process.env.DEV_LOGIN_ENABLED === '
 // ============================================================
 
 app.use(requireAuth);
+
+// Accountant role is read-only: block any mutating /api request for them.
+// They only need GET (oppdrag list + faktura-copy). Defense-in-depth on top of
+// the frontend hiding edit/admin views.
+app.use('/api', (req, res, next) => {
+  if (req.session.user && req.session.user.role === 'accountant' && req.method !== 'GET') {
+    return res.status(403).json({ success: false, error: 'Regnskap-rollen har kun lesetilgang' });
+  }
+  next();
+});
 
 // Static assets (public/) — gated: only authenticated users get the SPA shell + assets
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -355,6 +366,29 @@ app.get('/api/oppdrag/:row', async (req, res) => {
     res.json({ success: true, oppdrag });
   } catch (e) {
     console.error('get-oppdrag error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// --- Faktura copy text (PowerOffice paste, mirrors the email layout) ---
+app.get('/api/faktura-copy/:row', async (req, res) => {
+  try {
+    const rowNum = parseInt(req.params.row, 10);
+    if (!Number.isInteger(rowNum) || rowNum < 2) {
+      return res.status(400).json({ success: false, error: 'invalid row' });
+    }
+    if (config.demoMode) {
+      return res.json({ success: true, text: 'DEMO\nKunde: Demo Kunde\nProdukt 5 — Tilstandsrapport: 8000 kr eks. mva\nTOTAL EKS. MVA: 8000 kr' });
+    }
+    const google = require('./google');
+    const data = await google.getSheetData(config.sheet.name);
+    const rowData = data[rowNum - 1];
+    if (!rowData) return res.status(404).json({ success: false, error: 'not found' });
+    const { buildFakturaText } = require('./emails');
+    const text = buildFakturaText(rowData);
+    res.json({ success: true, text });
+  } catch (e) {
+    console.error('faktura-copy error:', e);
     res.status(500).json({ success: false, error: e.message });
   }
 });

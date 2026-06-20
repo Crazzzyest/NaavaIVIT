@@ -30,6 +30,13 @@ const config = {
     .map(s => s.trim().toLowerCase())
     .filter(Boolean),
 
+  // Accountant role — these emails log in but get a read-only "Regnskap" view
+  // (PowerOffice copy buttons), not the full admin/edit interface.
+  accountantEmails: (process.env.ACCOUNTANT_EMAILS || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean),
+
   sheet: {
     id: '1VEzaCNEkvbWYZf0UOrj6IG5PUQB3hL1enB24PvsQ1MI',
     name: 'Oppdragslogg',
