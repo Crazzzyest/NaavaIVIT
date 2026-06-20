@@ -236,6 +236,34 @@ app.get('/api/activity', (req, res) => {
   res.json({ success: true, entries: activity.list(limit) });
 });
 
+// --- Fakturalogg ---
+app.get('/api/fakturalogg', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+    const entries = await require('./fakturalogg').list(limit);
+    res.json({ success: true, entries });
+  } catch (e) {
+    console.error('fakturalogg list error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/fakturalogg/:id/resend', async (req, res) => {
+  if (config.demoMode) {
+    activity.admin('Demo: faktura sendt på nytt (ikke sendt)', { id: req.params.id });
+    return demoOk(res, 'faktura sendt på nytt (simulert)');
+  }
+  try {
+    const result = await require('./fakturalogg').resend(req.params.id);
+    activity.faktura(`Faktura sendt på nytt (oppdatering) — logg #${req.params.id}`, { by: req.session.user?.email });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('fakturalogg resend error:', e);
+    activity.error(`Faktura-resend feilet: ${e.message}`);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // --- Prisliste ---
 app.get('/api/prisliste', async (req, res) => {
   try {

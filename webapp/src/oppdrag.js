@@ -385,11 +385,11 @@ async function handleStatusChange(row, newStatus) {
 
     if (settings['email.sendFakturaToAccountant']) {
       const subject = substitute(settings['email.fakturaSubject'], { adresse, oppdragsnr });
-      await google.sendEmail(
-        config.email.accountantEmail,
-        subject,
-        buildFakturaEmail(rowData, datoStr),
-      );
+      const html = buildFakturaEmail(rowData, datoStr);
+      await google.sendEmail(config.email.accountantEmail, subject, html);
+      await require('./fakturalogg').log({
+        oppdragsnr, adresse, mottaker: config.email.accountantEmail, emne: subject, html, versjon: 1,
+      });
     }
 
     await google.updateCells(config.sheet.name, row, [
@@ -540,11 +540,10 @@ async function sendFakturaTilRegnskap() {
 
       const subject = substitute(settings['email.fakturaSubject'], { adresse: cleanAdr, oppdragsnr });
       const html = buildFakturaEmail(rowData, datoStr);
-      await google.sendEmail(
-        config.email.accountantEmail,
-        subject,
-        html,
-      );
+      await google.sendEmail(config.email.accountantEmail, subject, html);
+      await require('./fakturalogg').log({
+        oppdragsnr, adresse: cleanAdr, mottaker: config.email.accountantEmail, emne: subject, html, versjon: 1,
+      });
 
       await google.updateCells(config.sheet.name, rowNum, [
         { col: COL.KAN_FAKTURERES, value: false },
