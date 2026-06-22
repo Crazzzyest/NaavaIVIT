@@ -1356,8 +1356,8 @@
         ${editField('Fakturamotaker', 'fakturamotaker', o.fakturamotaker)}
       </div></div>`);
 
-      // Fakturamottaker (hvis annen enn megler)
-      sections.push(`<div class="modal-section"><h3>Fakturamottaker <span style="font-size:11px;color:#999;font-weight:normal">(fyll ut hvis annen enn megler)</span></h3><div class="field-grid">
+      // Fakturamottaker (hvis annen enn huseier)
+      sections.push(`<div class="modal-section"><h3>Fakturamottaker <span style="font-size:11px;color:#999;font-weight:normal">(fyll ut hvis annen enn huseier)</span></h3><div class="field-grid">
         ${editField('Adresse', 'fakturamotakerAdresse', o.fakturamotakerAdresse, { placeholder: 'Gate, postnr poststed' })}
         ${editField('E-post', 'fakturamotakerEpost', o.fakturamotakerEpost, { type: 'email' })}
         ${editField('Fakturainfo (org.nr, merking)', 'fakturamotakerInfo', o.fakturamotakerInfo)}
