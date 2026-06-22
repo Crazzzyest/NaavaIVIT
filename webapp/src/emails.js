@@ -71,7 +71,7 @@ function buildFakturaEmail(rowData, datoStr) {
   // Fakturamottaker (vises kun hvis annen enn megler er oppgitt)
   if (harAltFakturamottaker) {
     html += '<div style="background-color:#e8f0fe; border-left:5px solid #1a5c2a; padding:15px; margin-top:25px; border-radius:4px;">';
-    html += '<strong style="display:block; margin-bottom:8px; font-size:15px; color:#1a5c2a;">⚑ Faktura sendes til (annen enn megler):</strong>';
+    html += '<strong style="display:block; margin-bottom:8px; font-size:15px; color:#1a5c2a;">⚑ Faktura sendes til (annen enn huseier):</strong>';
     html += '<table style="width:100%; border-collapse:collapse; line-height:1.7;">';
     if (fmNavn)    html += `<tr><td style="width:140px; font-weight:bold;">Mottaker:</td><td>${fmNavn}</td></tr>`;
     if (fmAdresse) html += `<tr><td style="font-weight:bold;">Adresse:</td><td>${fmAdresse}</td></tr>`;
@@ -195,7 +195,7 @@ function buildFakturaText(rowData) {
   L.push(`  Poststed:    ${poststed}`);
   if (harAltFm) {
     L.push('');
-    L.push('FAKTURA SENDES TIL (annen enn megler)');
+    L.push('FAKTURA SENDES TIL (annen enn huseier)');
     if (fmNavn)    L.push(`  Mottaker:    ${fmNavn}`);
     if (fmAdresse) L.push(`  Adresse:     ${fmAdresse}`);
     if (fmEpost)   L.push(`  E-post:      ${fmEpost}`);
