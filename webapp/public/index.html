@@ -646,7 +646,8 @@
 
     <div class="admin-section">
       <h2>Fakturalogg</h2>
-      <div class="section-hint">Alle faktura-e-poster som er sendt til regnskap. Klikk «Vis e-post» for å se nøyaktig hva som ble sendt (sjekk for feil). «Send på nytt» sender en oppdatert versjon som tydelig markeres som en erstatning av den forrige.</div>
+      <div class="section-hint">Alle oppdrag som er fakturert. Klikk «Vis faktura» for å lese hele fakturaen, inkludert meldingen til regnskap, slik at du kan sjekke om noe ble skrevet feil. «Send på nytt» sender en oppdatert faktura som tydelig markeres som en erstatning av den forrige.</div>
+      <input type="text" class="search-box" id="fakturaloggSearch" placeholder="Søk adresse, oppdragsnr…" oninput="renderFakturalogg()" style="max-width:340px; margin-bottom:8px;">
       <div id="fakturaloggList"><div class="empty-row">Laster…</div></div>
     </div>
 
@@ -1604,19 +1605,26 @@
     function renderFakturalogg() {
       const el = document.getElementById('fakturaloggList');
       if (fakturaloggData.length === 0) {
-        el.innerHTML = '<div class="empty-row">Ingen fakturaer sendt ennå.</div>';
+        el.innerHTML = '<div class="empty-row">Ingen fakturerte oppdrag ennå.</div>';
         return;
       }
-      el.innerHTML = fakturaloggData.map(e => `
+      const q = (document.getElementById('fakturaloggSearch').value || '').toLowerCase();
+      let list = fakturaloggData;
+      if (q) list = list.filter(e => (e.adresse + ' ' + e.oppdragsnr).toLowerCase().includes(q));
+      if (list.length === 0) {
+        el.innerHTML = '<div class="empty-row">Ingen treff.</div>';
+        return;
+      }
+      el.innerHTML = list.map(e => `
         <div class="fl-entry">
           <div class="fl-time">${escapeHtml(e.tidspunkt)}</div>
           <div class="fl-main">
-            <div class="fl-nr">${escapeHtml(e.oppdragsnr)}${e.versjon > 1 ? `<span class="fl-ver">v${e.versjon}</span>` : ''}</div>
+            <div class="fl-nr">${escapeHtml(e.oppdragsnr)}${e.kommentar ? '<span class="fl-ver" style="background:#fff3cd;color:#856404;">melding</span>' : ''}</div>
             <div class="fl-adr">${escapeHtml(e.adresse)}</div>
-            <div class="fl-meta">Til: ${escapeHtml(e.mottaker)} · ${escapeHtml(e.emne)}</div>
+            <div class="fl-meta">${escapeHtml(e.status)} · til ${escapeHtml(e.mottaker)}</div>
           </div>
           <div class="fl-actions">
-            <button class="btn btn-outline" onclick="openFakturaPreview(${e.id})">Vis e-post</button>
+            <button class="btn btn-outline" onclick="openFakturaPreview(${e.id})">Vis faktura</button>
             <button class="btn btn-warn" onclick="openFakturaPreview(${e.id}, true)">Send på nytt</button>
           </div>
         </div>
@@ -1628,15 +1636,14 @@
       if (!entry) return;
       currentFpId = id;
       document.getElementById('fpTitle').textContent = `${entry.oppdragsnr} — ${entry.adresse}`;
-      document.getElementById('fpInfo').textContent = `Sendt ${entry.tidspunkt} til ${entry.mottaker}${entry.versjon > 1 ? ' (versjon ' + entry.versjon + ')' : ''}`;
-      // Render the stored HTML inside a sandboxed iframe so styles don't leak
+      document.getElementById('fpInfo').textContent = `${entry.status} ${entry.tidspunkt} · sendt til ${entry.mottaker}`;
+      // Show the readable plain-text faktura (includes the message to regnskap)
       const body = document.getElementById('fpBody');
       body.innerHTML = '';
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'width:100%; height:60vh; border:1px solid #ddd; border-radius:6px; background:white;';
-      iframe.setAttribute('sandbox', '');
-      body.appendChild(iframe);
-      iframe.srcdoc = entry.html || '<p style="font-family:Arial;padding:20px;color:#999">Ingen lagret e-post-HTML.</p>';
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'white-space:pre-wrap; word-break:break-word; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.6; background:white; border:1px solid #ddd; border-radius:6px; padding:18px; margin:0; color:#222;';
+      pre.textContent = entry.text || 'Ingen fakturainnhold.';
+      body.appendChild(pre);
       document.getElementById('fakturaPreviewModal').classList.add('on');
       document.body.style.overflow = 'hidden';
     }

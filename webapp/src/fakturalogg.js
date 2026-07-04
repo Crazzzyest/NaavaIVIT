@@ -1,108 +1,98 @@
 const config = require('./config');
 const google = require('./google');
 const { COL } = require('./columns');
-const { formatDate } = require('./utils');
+const { formatDate, extractAddressFromHyperlink, parseDateString } = require('./utils');
 
-const SHEET = 'Fakturalogg';
-const HEADER = ['Tidspunkt', 'Timestamp (ISO)', 'Oppdragsnr', 'Adresse', 'Mottaker', 'Emne', 'Versjon', 'HTML'];
+// Oppdrag counted as "invoiced" — i.e. a faktura has been sent to regnskap.
+const INVOICED_STATUSES = ['Fakturert', 'Oppdrag fullført'];
 
 // ============================================================
-// Append one sent-faktura record to the Fakturalogg sheet.
-// Stores full HTML so the admin can review exactly what was sent.
+// Fakturalogg is RECONSTRUCTED from the sheet, not from a send-log.
+//
+// Why: the faktura email can be sent by either the webapp OR the Apps Script
+// (which runs the automation in production). A send-log would only capture
+// webapp sends and miss everything Apps Script did. Instead we derive a
+// readable faktura for every oppdrag that has reached an invoiced status.
+// This is always complete and shows the actual data (including the comment
+// to regnskap) as plain, readable text.
 // ============================================================
-async function log({ oppdragsnr, adresse, mottaker, emne, html, versjon }) {
-  if (config.demoMode) return { demoMode: true };
 
-  const now = new Date();
-  const row = [
-    formatDate(now, 'dd.MM.yyyy HH:mm'),
-    now.toISOString(),
-    String(oppdragsnr || ''),
-    String(adresse || ''),
-    String(mottaker || ''),
-    String(emne || ''),
-    String(versjon || 1),
-    String(html || ''),
-  ];
-
-  try {
-    // Ensure header exists on first write
-    const existing = await google.getSheetData(SHEET).catch(() => []);
-    if (!existing || existing.length === 0) {
-      await google.appendRow(SHEET, HEADER);
-    }
-    await google.appendRow(SHEET, row);
-  } catch (e) {
-    console.error('Fakturalogg.log failed:', e.message);
-  }
-  return { logged: true };
+function reconstruct(row, rowNum) {
+  const { buildFakturaText } = require('./emails');
+  return {
+    id: rowNum,
+    oppdragsnr: row[COL.OPPDRAGSNR - 1] || '',
+    adresse: extractAddressFromHyperlink(row[COL.ADRESSE - 1]),
+    status: row[COL.STATUS - 1] || '',
+    tidspunkt: row[COL.DATO_STATUSENDRING - 1] || row[COL.DATO_MOTTATT - 1] || '',
+    mottaker: config.email.accountantEmail,
+    kommentar: String(row[COL.KOMMENTAR_REGNSKAP - 1] || '').trim(),
+    text: buildFakturaText(row),
+  };
 }
 
-// ============================================================
-// List recent faktura records (newest first).
-// ============================================================
-async function list(limit = 100) {
+async function list(limit = 300) {
   if (config.demoMode) {
-    return [{
-      id: 2,
-      tidspunkt: formatDate(new Date(), 'dd.MM.yyyy HH:mm'),
-      oppdragsnr: 'DEMO-001',
-      adresse: 'Demogata 1, 0001 Demo',
-      mottaker: config.email.accountantEmail,
-      emne: 'Klar til fakturering: Demogata 1 (DEMO-001)',
-      versjon: 1,
-      html: '<div style="font-family:Arial">Demo faktura-innhold</div>',
-    }];
+    const { buildFakturaText } = require('./emails');
+    const demoRow = new Array(43).fill('');
+    demoRow[COL.OPPDRAGSNR - 1] = 'NT-202606-001';
+    demoRow[COL.ADRESSE - 1] = 'Demogata 1, 0001 Demo';
+    demoRow[COL.STATUS - 1] = 'Fakturert';
+    demoRow[COL.DATO_STATUSENDRING - 1] = formatDate(new Date(), 'dd.MM.yyyy HH:mm');
+    demoRow[COL.SELGER - 1] = 'Demo Selger';
+    demoRow[COL.PRIS_EKS - 1] = 8000;
+    demoRow[COL.PRODUKTNUMMER - 1] = '5';
+    demoRow[COL.RAPPORTTYPE - 1] = 'Tilstandsrapport';
+    demoRow[COL.KOMMENTAR_REGNSKAP - 1] = 'Faktureres samlet med naboeiendommen.';
+    return [reconstruct(demoRow, 2)];
   }
 
-  let rows;
-  try {
-    rows = await google.getSheetData(SHEET);
-  } catch {
-    return [];
-  }
-  if (!rows || rows.length < 2) return [];
+  const data = await google.getSheetData(config.sheet.name);
+  if (!data || data.length < 2) return [];
 
   const out = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i] || [];
-    out.push({
-      id: i + 1, // sheet row number
-      tidspunkt: r[0] || '',
-      iso: r[1] || '',
-      oppdragsnr: r[2] || '',
-      adresse: r[3] || '',
-      mottaker: r[4] || '',
-      emne: r[5] || '',
-      versjon: Number(r[6]) || 1,
-      html: r[7] || '',
-    });
+  for (let i = 1; i < data.length; i++) {
+    const status = data[i][COL.STATUS - 1];
+    if (!INVOICED_STATUSES.includes(status)) continue;
+    out.push(reconstruct(data[i], i + 1));
   }
-  // Newest first
-  out.reverse();
+
+  // Newest first, by status-change date
+  out.sort((a, b) => {
+    const da = parseDateString(a.tidspunkt);
+    const db = parseDateString(b.tidspunkt);
+    return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+  });
+
   return out.slice(0, limit);
 }
 
 async function getById(id) {
-  const all = await list(1000);
-  return all.find(e => e.id === Number(id)) || null;
+  if (config.demoMode) {
+    const all = await list();
+    return all.find(e => e.id === Number(id)) || null;
+  }
+  const data = await google.getSheetData(config.sheet.name);
+  const row = data[Number(id) - 1];
+  if (!row) return null;
+  return reconstruct(row, Number(id));
 }
 
 // ============================================================
 // Re-send a faktura as an UPDATE that overwrites the previous one.
-// Rebuilds from the CURRENT row data (so any fixes are reflected) and
-// prepends a banner telling regnskap this replaces the earlier mail.
+// Rebuilds from the current row data and prepends a banner telling regnskap
+// this replaces the earlier mail.
 // ============================================================
 async function resend(id) {
   if (config.demoMode) return { demoMode: true };
 
-  const entry = await getById(id);
-  if (!entry) throw new Error('Fakturalogg-oppføring ikke funnet');
+  const data = await google.getSheetData(config.sheet.name);
+  const row = data[Number(id) - 1];
+  if (!row) throw new Error('Fant ikke oppdraget');
 
-  // Find the current row for this oppdrag (Oppdragslogg first, then arkiv)
-  let rowData = await findRowByOppdragsnr(config.sheet.name, entry.oppdragsnr);
-  if (!rowData) rowData = await findRowByOppdragsnr('arkiv', entry.oppdragsnr);
-  if (!rowData) throw new Error(`Fant ikke oppdrag ${entry.oppdragsnr} i Oppdragslogg eller arkiv`);
+  const oppdragsnr = row[COL.OPPDRAGSNR - 1] || '';
+  const adresse = extractAddressFromHyperlink(row[COL.ADRESSE - 1]);
+  const tidspunkt = row[COL.DATO_STATUSENDRING - 1] || '';
 
   const { buildFakturaEmail } = require('./emails');
   const datoStr = formatDate(new Date(), 'dd.MM.yyyy HH:mm');
@@ -111,38 +101,16 @@ async function resend(id) {
     '<div style="background:#fff3cd; border:2px solid #e0a800; padding:16px; ' +
     'margin-bottom:20px; border-radius:6px; color:#856404;">' +
     '<strong style="font-size:16px; display:block; margin-bottom:6px;">⚠️ OPPDATERT FAKTURA — ERSTATTER TIDLIGERE</strong>' +
-    `Denne e-posten <strong>erstatter</strong> fakturaen som ble sendt ${entry.tidspunkt}. ` +
+    `Denne e-posten <strong>erstatter</strong> fakturaen som ble sendt tidligere${tidspunkt ? ' (' + tidspunkt + ')' : ''}. ` +
     'Bruk opplysningene i <strong>denne</strong> e-posten. Forrige versjon skal forkastes.' +
     '</div>';
 
-  const html = banner + buildFakturaEmail(rowData, datoStr);
-  const subject = '[OPPDATERT] ' + entry.emne.replace(/^\[OPPDATERT\]\s*/, '');
+  const html = banner + buildFakturaEmail(row, datoStr);
+  const subject = `[OPPDATERT] Klar til fakturering: ${adresse} (${oppdragsnr})`;
 
   await google.sendEmail(config.email.accountantEmail, subject, html);
 
-  const nyVersjon = (entry.versjon || 1) + 1;
-  await log({
-    oppdragsnr: entry.oppdragsnr,
-    adresse: entry.adresse,
-    mottaker: config.email.accountantEmail,
-    emne: subject,
-    html,
-    versjon: nyVersjon,
-  });
-
-  return { resent: true, versjon: nyVersjon };
+  return { resent: true, oppdragsnr };
 }
 
-async function findRowByOppdragsnr(sheetName, oppdragsnr) {
-  try {
-    const data = await google.getSheetData(sheetName);
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][COL.OPPDRAGSNR - 1] || '') === String(oppdragsnr)) {
-        return data[i];
-      }
-    }
-  } catch { /* sheet may not exist */ }
-  return null;
-}
-
-module.exports = { log, list, getById, resend, SHEET };
+module.exports = { list, getById, resend };

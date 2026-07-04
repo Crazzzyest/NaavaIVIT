@@ -182,9 +182,16 @@ function buildFakturaText(rowData) {
   let baseEks = totalEks - markedEks - tilleggEks;
   if (baseEks < 0) { baseEks = totalEks; markedEks = 0; tilleggEks = 0; }
 
+  const kommentarRegnskap = String(rowData[COL.KOMMENTAR_REGNSKAP - 1] || '').trim();
+
   const kr = (n) => Math.round(n).toLocaleString('nb-NO') + ' kr';
   const L = [];
   L.push(`OPPDRAG: ${oppdragsnr}`);
+  if (kommentarRegnskap) {
+    L.push('');
+    L.push('MELDING TIL REGNSKAP:');
+    kommentarRegnskap.split('\n').forEach(line => L.push(`  ${line}`));
+  }
   L.push('');
   L.push('KUNDE');
   L.push(`  Navn/Firma:  ${kundeNavn}`);
