@@ -515,6 +515,7 @@
   <div class="toolbar">
     <input type="text" class="search-box" id="searchBox" placeholder="Raskt søk på adresse, oppdragsnr, megler, selger…" oninput="onSearch()">
     <div class="toolbar-actions">
+      <button class="btn btn-outline" onclick="runIvitNow(this)">Kjør IVIT-henting nå</button>
       <button class="btn btn-outline" onclick="loadData()">Oppdater</button>
     </div>
   </div>
@@ -2065,6 +2066,26 @@
         loadActivity();
       } catch (e) {
         showToast(`${jobName}: ${e.message}`, 'error');
+      }
+    }
+
+    async function runIvitNow(btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Henter…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin/trigger/processIvit', { method: 'POST' });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        const n = data.result?.processed;
+        showToast(data.demoMode ? 'Demo: IVIT-henting simulert' : `IVIT-henting ferdig${n != null ? ' — ' + n + ' oppdrag oppdatert' : ''}`, 'success');
+        loadData();
+      } catch (e) {
+        showToast('IVIT-henting feilet: ' + e.message, 'error');
+      } finally {
+        btn.textContent = orig;
+        btn.disabled = false;
       }
     }
 
