@@ -49,12 +49,13 @@ app.post('/webhook', validateRequest, async (req, res) => {
   }
 
   const trimmedAddress = address.trim();
-  // If caller supplied per-request credentials, use those. Else scraper falls
-  // back to its IVIT_USERNAME/IVIT_PASSWORD env vars.
-  const creds = (ivitUsername && ivitPassword)
+  // If caller supplied per-request credentials, use those. Each field falls
+  // back independently to IVIT_USERNAME/IVIT_PASSWORD env vars in login() —
+  // so a request with only one of the two fields must NOT discard the other.
+  const creds = (ivitUsername || ivitPassword)
     ? { username: ivitUsername, password: ivitPassword }
     : null;
-  console.log(`\n=== Webhook received: "${trimmedAddress}" (creds: ${creds ? 'per-request' : 'env-vars'}) ===`);
+  console.log(`\n=== Webhook received: "${trimmedAddress}" (username: ${ivitUsername ? 'per-request' : 'env-var'}, password: ${ivitPassword ? 'per-request' : 'env-var'}) ===`);
 
   try {
     const data = await scrapeOppdrag(trimmedAddress, creds);
