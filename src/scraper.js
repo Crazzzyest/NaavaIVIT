@@ -390,48 +390,53 @@ async function findOppdrag(address, creds) {
   await dumpPageHtml('search-results');
   await saveScreenshot('search-results');
 
-  // Find a matching result in the search dropdown
-  const matchResult = await p.evaluate((addr) => {
+  // Find a matching result in the search dropdown.
+  //
+  // IVIT renamed these classes (seen 02.09.2026): a result row used to be
+  // .mission-card / .row inside .search-result, and is now .search-result-item
+  // inside .search-result-list. The old names are kept in the selector so an
+  // older IVIT deploy (or a revert on their side) still works.
+  const RESULT_SELECTOR = [
+    '.search-result .search-result-item',
+    '.search-result .mission-card',
+    '.search-result .mat-card',
+    '.search-result .row:not(.mission-header)',
+  ].join(', ');
+
+  const matchResult = await p.evaluate((addr, sel) => {
     const addrLower = addr.toLowerCase();
-    // Look in search results for mission cards
-    const cards = document.querySelectorAll('.search-result .mission-card, .search-result .mat-card, .search-result .row');
-    for (const card of cards) {
-      const text = card.textContent?.toLowerCase() || '';
-      if (text.includes(addrLower)) {
-        return { found: true, text: card.textContent.trim().substring(0, 300) };
-      }
+    const cards = Array.from(document.querySelectorAll(sel));
+    const textOf = (el) => (el.textContent || '').toLowerCase();
+
+    // Exact: street + number, e.g. "vesterheim 20".
+    // Only the street part is compared — IVIT sometimes shows a different
+    // poststed than the sheet does (e.g. "6270 HARAM" vs "6270 BRATTVÅG"),
+    // so the postal town must never be part of the comparison.
+    const exactIdx = cards.findIndex(c => textOf(c).includes(addrLower));
+    if (exactIdx !== -1) {
+      return { found: true, index: exactIdx, text: cards[exactIdx].textContent.trim().substring(0, 300) };
     }
 
-    // Also try any clickable element in search results
-    const results = document.querySelectorAll('.search-result a, .search-result [class*="card"], .search-result [class*="mission"]');
-    for (const el of results) {
-      const text = el.textContent?.toLowerCase() || '';
-      if (text.includes(addrLower)) {
-        return { found: true, text: el.textContent.trim().substring(0, 300) };
-      }
-    }
-
-    // Fuzzy: match street name without number
+    // Fuzzy: street name without the house number ("vesterheim").
+    // Accepted only when it is unambiguous — a search for "Vesterheim 20" also
+    // surfaces "Vesterheim 7A", and picking the wrong one would scrape another
+    // property's data into the sheet.
     const streetName = addrLower.split(/\d/)[0].trim();
     if (streetName.length > 3) {
-      const allResults = document.querySelectorAll('.search-result *');
-      for (const el of allResults) {
-        const text = el.textContent?.toLowerCase() || '';
-        if (text.includes(streetName) && el.closest('.mission-card, .mat-card, a, [class*="mission"]')) {
-          return { found: true, text: el.closest('.mission-card, .mat-card, a, [class*="mission"]').textContent.trim().substring(0, 300), fuzzy: true };
-        }
+      const fuzzyIdx = cards
+        .map((c, i) => (textOf(c).includes(streetName) ? i : -1))
+        .filter(i => i !== -1);
+      if (fuzzyIdx.length === 1) {
+        const i = fuzzyIdx[0];
+        return { found: true, index: i, fuzzy: true, text: cards[i].textContent.trim().substring(0, 300) };
       }
     }
 
-    // Collect what results are visible for debugging
-    const visibleResults = [];
-    const allCards = document.querySelectorAll('.search-result .mission-card, .search-result .row:not(.mission-header)');
-    allCards.forEach((c, i) => {
-      if (i < 5) visibleResults.push(c.textContent?.trim().substring(0, 200));
-    });
-
-    return { found: false, visibleResults };
-  }, mainAddress);
+    return {
+      found: false,
+      visibleResults: cards.slice(0, 5).map(c => (c.textContent || '').trim().substring(0, 200)),
+    };
+  }, mainAddress, RESULT_SELECTOR);
 
   if (!matchResult.found) {
     await saveScreenshot('no-match');
@@ -441,22 +446,14 @@ async function findOppdrag(address, creds) {
     throw new Error(`No oppdrag found for address: ${address}.${debugInfo}`);
   }
 
-  console.log('Found matching oppdrag:', matchResult.text);
+  console.log(`Found matching oppdrag${matchResult.fuzzy ? ' (fuzzy)' : ''}:`, matchResult.text);
 
-  // Click the matching search result to navigate to detail page
-  await p.evaluate((addr) => {
-    const addrLower = addr.toLowerCase();
-    const streetName = addrLower.split(/\\d/)[0].trim();
-
-    const clickables = document.querySelectorAll('.search-result .mission-card, .search-result .mat-card, .search-result a, .search-result .row:not(.mission-header)');
-    for (const el of clickables) {
-      const text = el.textContent?.toLowerCase() || '';
-      if (text.includes(addrLower) || (streetName.length > 3 && text.includes(streetName))) {
-        el.click();
-        return;
-      }
-    }
-  }, mainAddress);
+  // Click the result we matched. Clicking by index rather than re-running the
+  // matching keeps the clicked row and the matched row guaranteed identical.
+  await p.evaluate((sel, index) => {
+    const cards = document.querySelectorAll(sel);
+    if (cards[index]) cards[index].click();
+  }, RESULT_SELECTOR, matchResult.index);
 
   // Wait for navigation to the detail page
   await new Promise(r => setTimeout(r, 1000));
