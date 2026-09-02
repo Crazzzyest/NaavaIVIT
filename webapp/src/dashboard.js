@@ -5,6 +5,10 @@ const { formatCurrency, parseDateString, classifyBoligBucket, formatDate } = req
 
 const STATUS_LIST = ['Mottatt', 'Avtalt befaring', 'Befart', 'Utkast', 'Endelig rapport', 'Kan faktureres', 'Fakturert', 'Oppdrag kansellert', 'Oppdrag fullført'];
 
+// Pending-review statuses — not real oppdrag yet, excluded from stats
+// (mirrors the same exclusion in data.js's getDashboardData).
+const ORDRE_STATUSES = ['Ordre', 'Ordre avvist'];
+
 // ============================================================
 // computeDashboardStats — pure function. Returns the stats object.
 // Used by both updateDashboard() (writes to Sheet) and /api/dashboard-stats
@@ -76,9 +80,11 @@ function computeDashboardStats(data, opts = {}) {
     return Number.isFinite(n) ? n : 0;
   }
 
+  let ordreStageCount = 0;
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const status = row[COL.STATUS - 1];
+    if (ORDRE_STATUSES.includes(status)) { ordreStageCount++; continue; }
     const type = row[COL.OPPDRAGSTYPE - 1];
     const bolig = row[COL.BOLIGTYPE - 1];
     const areal = row[COL.AREAL - 1] ? Number(row[COL.AREAL - 1]) : 0;
@@ -132,6 +138,7 @@ function computeDashboardStats(data, opts = {}) {
     }
   }
 
+  stats.total -= ordreStageCount;
   stats.snittAntall = countPris;
   stats.snittPrisInkl = countPris ? Math.round(sumPrisInkl / countPris) : 0;
   stats.snittPrisEks = countPris ? Math.round(sumPrisEks / countPris) : 0;

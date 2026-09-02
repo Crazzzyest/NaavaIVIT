@@ -353,6 +353,18 @@ app.get('/api/dashboard-stats', async (req, res) => {
   }
 });
 
+// --- Ordre (pending review, status 'Ordre' / 'Ordre avvist') ---
+app.get('/api/ordre', async (req, res) => {
+  try {
+    const { getOrdreList } = require('./data');
+    const ordre = await getOrdreList();
+    res.json({ success: true, ordre });
+  } catch (e) {
+    console.error('ordre-list error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // --- Single oppdrag ---
 app.get('/api/oppdrag/:row', async (req, res) => {
   try {

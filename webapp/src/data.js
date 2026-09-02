@@ -7,6 +7,10 @@ const { parseDateString } = require('./utils');
 let cache = { ts: 0, rows: null };
 const CACHE_TTL_MS = 5000;
 
+// Pending-review statuses — not real oppdrag yet, excluded from the main
+// oppdrag list/stats until Jacob approves them in the Ordre view.
+const ORDRE_STATUSES = ['Ordre', 'Ordre avvist'];
+
 // Sheet cells come back as locale-formatted strings ("16 000 kr", "12,800 kr",
 // "0,25", "0.25", or plain numbers). This extracts the numeric value robustly,
 // distinguishing comma-as-thousand-separator from comma-as-decimal-mark.
@@ -172,6 +176,8 @@ async function getDashboardData() {
 
   for (let i = 1; i < rows.length; i++) {
     const o = projectRow(rows[i], i + 1);
+    if (ORDRE_STATUSES.includes(o.status)) continue; // not a real oppdrag yet
+
     oppdrag.push(o);
 
     statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
@@ -198,7 +204,7 @@ async function getDashboardData() {
     }
   }
 
-  const total = rows.length - 1;
+  const total = oppdrag.length;
   const active = total
     - (statusCounts['Fakturert'] || 0)
     - (statusCounts['Oppdrag kansellert'] || 0)
@@ -217,6 +223,23 @@ async function getDashboardData() {
     oppdrag,
     statusCounts,
   };
+}
+
+// ============================================================
+// ORDRE — pending-review oppdrag (status 'Ordre' / 'Ordre avvist').
+// Mirror of the exclusion in getDashboardData(), inverted.
+// ============================================================
+async function getOrdreList() {
+  if (config.demoMode) return [];
+  const rows = await getRowsCached();
+  if (!rows || rows.length < 2) return [];
+
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const o = projectRow(rows[i], i + 1);
+    if (ORDRE_STATUSES.includes(o.status)) out.push(o);
+  }
+  return out;
 }
 
 // Whitelist of fields the PATCH endpoint may write.
@@ -411,6 +434,7 @@ module.exports = {
   getOppdrag,
   getDashboardData,
   getDashboardStats,
+  getOrdreList,
   patchOppdrag,
   PATCHABLE_FIELDS,
   bustCache,

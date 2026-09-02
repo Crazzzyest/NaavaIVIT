@@ -7,6 +7,9 @@ const { buildWeeklyReportHtml } = require('./emails');
 async function checkReminders() {
   console.log('Checking reminders...');
 
+  const settings = await require('./settings').get();
+  if (!settings['email.sendUrgentReminder']) return { alerts: 0 };
+
   const data = await google.getSheetData(config.sheet.name);
   if (!data || data.length < 2) return { alerts: 0 };
 

@@ -251,7 +251,7 @@ function hasSameMonthDuplicate(data, incomingAddrClean, date) {
   return false;
 }
 
-async function createNewOppdrag(parsed, date) {
+async function createNewOppdrag(parsed, date, skipOrdreGate = false) {
   try {
     console.log(`>>> createNewOppdrag: ${parsed.adresse}`);
 
@@ -344,7 +344,10 @@ async function createNewOppdrag(parsed, date) {
     newRow[COL.AVSTAND_KM - 1] = avstandKm;
     newRow[COL.REISE_EKS - 1] = reiseEks;
     newRow[COL.REISE_INKL - 1] = reiseInkl;
-    newRow[COL.STATUS - 1] = 'Mottatt';
+    // New oppdrag land in 'Ordre' (pending review), not 'Mottatt' — Jacob
+    // approves/rejects them in the Ordre view before they become real oppdrag.
+    // Manual intake skips the gate since Jacob is already reviewing as he types.
+    newRow[COL.STATUS - 1] = skipOrdreGate ? 'Mottatt' : 'Ordre';
     newRow[COL.DATO_STATUSENDRING - 1] = datoMottatt;
     newRow[COL.TIMESTAMP - 1] = timestamp;
     newRow[COL.LINK_MAPPE - 1] = folderUrl;
@@ -590,7 +593,7 @@ async function registerManualOppdrag(data) {
     parsed = sanitizeParsedData(parsed);
   }
 
-  const oppdragsnr = await createNewOppdrag(parsed, new Date());
+  const oppdragsnr = await createNewOppdrag(parsed, new Date(), true);
 
   // Set boligtype/areal and calculate price
   if (oppdragsnr) {

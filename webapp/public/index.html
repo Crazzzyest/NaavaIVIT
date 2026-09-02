@@ -14,6 +14,8 @@
     .nav-btn { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); border: none; padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; text-decoration: none; }
     .nav-btn:hover { background: rgba(255,255,255,0.22); color: white; }
     .nav-btn.active { background: white; color: #1a5c2a; font-weight: 600; }
+    .nav-btn .count { background: #ff9800; color: white; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .nav-btn.active .count { background: #e65100; }
     .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
     .mode-badge { padding: 4px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; }
     .mode-badge.prod { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
@@ -47,7 +49,8 @@
     .toolbar { padding: 16px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .search-box { flex: 1; min-width: 200px; max-width: 400px; padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.15s; }
     .search-box:focus { border-color: #1a5c2a; }
-    .toolbar-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+    .toolbar-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+    .toolbar-actions select { padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; color: #555; background: white; cursor: pointer; }
     .btn { padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
     .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -111,6 +114,22 @@
     /* ── Dashboard view ── */
     .dashboard-view { display: none; padding: 24px; max-width: 1200px; margin: 0 auto; }
     .dashboard-view.on { display: block; }
+
+    /* ── Ordre view ── */
+    .ordre-view { display: none; }
+    .ordre-view.on { display: block; }
+    .ordre-hint { padding: 14px 24px 0; font-size: 13px; color: #777; }
+    .ordre-card { background: white; border-radius: 10px; padding: 18px 24px; margin: 0 24px 12px; display: flex; align-items: center; gap: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .ordre-card .card-main { flex: 1; min-width: 0; }
+    .ordre-card .card-dates { font-size: 12px; color: #999; margin-top: 4px; }
+    .ordre-card .card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .ordre-card .tag-avvist { background: #ffebee; color: #c62828; }
+
+    /* ── Inline card checkboxes (Fakturer / IVIT-skann) ── */
+    .card-checks { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+    .card-check { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #666; cursor: pointer; user-select: none; white-space: nowrap; }
+    .card-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #2e7d32; margin: 0; }
+    .card-check.check-ivit input[type="checkbox"] { accent-color: #1565c0; }
     .dash-section { background: white; border-radius: 10px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     .dash-section h2 { font-size: 16px; color: #1a5c2a; margin: 0 0 14px; font-weight: 600; }
     .dash-section h2 .sub { font-size: 12px; color: #999; font-weight: normal; margin-left: 8px; }
@@ -433,21 +452,27 @@
       /* Card layout: grid-based stacking */
       .oppdrag-card {
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: auto 1fr auto;
         grid-template-rows: auto auto;
-        gap: 6px 12px;
+        gap: 6px 10px;
         padding: 14px 16px;
         align-items: start;
       }
-      .card-main { grid-column: 1 / 3; grid-row: 1; min-width: 0; }
+      .card-checks { grid-column: 1; grid-row: 1 / 3; flex-direction: column; justify-content: center; gap: 8px; }
+      .card-check { font-size: 0; gap: 0; }
+      .card-check input[type="checkbox"] { width: 20px; height: 20px; }
+      .card-main { grid-column: 2 / 4; grid-row: 1; min-width: 0; }
       .card-main .card-address { font-size: 14px; }
       .card-main .card-dates { font-size: 11px; margin-top: 2px; }
-      .card-info { grid-column: 1; grid-row: 2; flex-direction: row !important; gap: 8px; align-items: baseline; min-width: 0; }
+      .card-info { grid-column: 2; grid-row: 2; flex-direction: row !important; gap: 8px; align-items: baseline; min-width: 0; }
       .card-info .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .card-info .phone { font-size: 12px; flex-shrink: 0; color: #999; }
-      .card-price { grid-column: 2; grid-row: 2; text-align: right; align-self: center; min-width: auto; }
+      .card-price { grid-column: 3; grid-row: 2; text-align: right; align-self: center; min-width: auto; }
       .card-price .amount { font-size: 15px; }
       .card-price .sub { font-size: 10px; }
+
+      .ordre-card { margin: 0 12px 10px; padding: 14px 16px; flex-wrap: wrap; }
+      .ordre-card .card-actions { width: 100%; justify-content: flex-end; }
 
       /* Modal full-screen on mobile */
       .modal-overlay { padding: 0; }
@@ -467,6 +492,7 @@
   <!-- Top navigation -->
   <nav class="topnav">
     <div class="logo">NAAVA</div>
+    <button class="nav-btn full-only" data-view="ordre" onclick="setView('ordre')">Ordre <span class="count" id="navOrdreCount" style="display:none"></span></button>
     <button class="nav-btn active full-only" data-view="oppdrag" onclick="setView('oppdrag')">Oppdrag</button>
     <button class="nav-btn full-only" data-view="ny" onclick="setView('ny')">Manuell intake</button>
     <button class="nav-btn full-only" data-view="dashboard" onclick="setView('dashboard')">Dashboard</button>
@@ -515,6 +541,12 @@
   <div class="toolbar">
     <input type="text" class="search-box" id="searchBox" placeholder="Raskt søk på adresse, oppdragsnr, megler, selger…" oninput="onSearch()">
     <div class="toolbar-actions">
+      <select id="sortSelect" onchange="onSortChange()" title="Sorter">
+        <option value="dato-ny">Dato mottatt (nyeste)</option>
+        <option value="dato-gml">Dato mottatt (eldste)</option>
+        <option value="endret-ny">Sist endret (nyeste)</option>
+        <option value="adresse">Adresse (A–Å)</option>
+      </select>
       <button class="btn btn-outline" onclick="runIvitNow(this)">Kjør IVIT-henting nå</button>
       <button class="btn btn-outline" onclick="loadData()">Oppdater</button>
     </div>
@@ -540,6 +572,27 @@
   </div>
 
   </div><!-- /oppdrag-view -->
+
+  <!-- ============================================================
+       ORDRE VIEW (toggled via topnav) — pending review before an
+       oppdrag becomes real. Mirrors IVIT's own Ordre-tab naming.
+       ============================================================ -->
+  <div class="ordre-view" id="ordreView">
+    <div class="tab-bar" id="ordreTabBar">
+      <div class="tab active" data-ofilter="nye">Nye <span class="count" id="ordreCountNye">0</span></div>
+      <div class="tab" data-ofilter="avvist">Avvist <span class="count" id="ordreCountAvvist">0</span></div>
+    </div>
+    <div class="ordre-hint">Nye oppdrag fra e-postskanning havner her først. Godkjenn for å legge dem i Oppdrag-listen, eller avvis — avviste kan hentes inn igjen.</div>
+    <div class="toolbar">
+      <input type="text" class="search-box" id="ordreSearchBox" placeholder="Søk på adresse, oppdragsnr, megler, selger…" oninput="renderOrdre()">
+      <div class="toolbar-actions">
+        <button class="btn btn-outline" onclick="loadOrdre()">Oppdater</button>
+      </div>
+    </div>
+    <div id="ordreList">
+      <div class="loading"><div class="spinner"></div><br>Henter ordre…</div>
+    </div>
+  </div>
 
   <!-- ============================================================
        DASHBOARD VIEW (toggled via topnav)
@@ -806,6 +859,7 @@
     let currentFilter = 'alle';
     let currentPage = 1;
     let searchQuery = '';
+    let currentSort = 'dato-ny';
     let currentUser = null;
 
     // ── Data loading ──
@@ -990,7 +1044,59 @@
           (o.oppdragstype || '').toLowerCase().includes(q)
         );
       }
+      list = list.slice().sort((a, b) => {
+        if (currentSort === 'adresse') {
+          return (a.adresse || '').localeCompare(b.adresse || '', 'nb');
+        }
+        if (currentSort === 'endret-ny') return dateCmp(a.datoStatusendring, b.datoStatusendring, true);
+        if (currentSort === 'dato-gml') return dateCmp(a.datoMottatt, b.datoMottatt, false);
+        return dateCmp(a.datoMottatt, b.datoMottatt, true); // dato-ny (default)
+      });
       return list;
+    }
+
+    // Parses "dd.MM.yyyy HH:mm" (or just "dd.MM.yyyy") sheet dates into a timestamp, or null if unparseable/empty.
+    function parseNorDate(s) {
+      if (!s) return null;
+      const m = String(s).match(/(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+      if (!m) return null;
+      return new Date(+m[3], +m[2] - 1, +m[1], +m[4] || 0, +m[5] || 0).getTime();
+    }
+
+    // Date comparator that always sinks missing/unparseable dates to the end, regardless of sort direction.
+    function dateCmp(aVal, bVal, desc) {
+      const a = parseNorDate(aVal), b = parseNorDate(bVal);
+      if (a === null && b === null) return 0;
+      if (a === null) return 1;
+      if (b === null) return -1;
+      return desc ? b - a : a - b;
+    }
+
+    function onSortChange() {
+      currentSort = document.getElementById('sortSelect').value;
+      currentPage = 1;
+      renderCards();
+    }
+
+    async function toggleCardField(rowNum, fieldName, el) {
+      el.disabled = true;
+      try {
+        const res = await fetch(`/api/oppdrag/${rowNum}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [fieldName]: el.checked }),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        const o = allOppdrag.find(x => x.rowNum === rowNum);
+        if (o) o[fieldName] = el.checked;
+      } catch (e) {
+        el.checked = !el.checked;
+        showToast('Kunne ikke lagre: ' + e.message, 'error');
+      } finally {
+        el.disabled = false;
+      }
     }
 
     function onSearch() {
@@ -1003,12 +1109,115 @@
     document.getElementById('tabBar').addEventListener('click', e => {
       const tab = e.target.closest('.tab');
       if (!tab) return;
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#tabBar .tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       currentFilter = tab.dataset.filter;
       currentPage = 1;
       renderCards();
     });
+
+    // ── Ordre view ──
+    let ordreData = [];
+    let ordreFilter = 'nye';
+
+    document.getElementById('ordreTabBar').addEventListener('click', e => {
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      document.querySelectorAll('#ordreTabBar .tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      ordreFilter = tab.dataset.ofilter;
+      renderOrdre();
+    });
+
+    async function loadOrdre() {
+      try {
+        document.getElementById('ordreList').innerHTML = '<div class="loading"><div class="spinner"></div><br>Henter ordre…</div>';
+        const res = await fetch('/api/ordre');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        ordreData = data.ordre || [];
+        renderOrdre();
+        const navCount = document.getElementById('navOrdreCount');
+        const nye = ordreData.filter(o => o.status === 'Ordre').length;
+        if (nye > 0) { navCount.textContent = nye; navCount.style.display = ''; }
+        else { navCount.style.display = 'none'; }
+      } catch (e) {
+        document.getElementById('ordreList').innerHTML = `<div class="empty-row">Kunne ikke hente ordre: ${escapeHtml(e.message)}</div>`;
+        showToast('Ordre-feil: ' + e.message, 'error');
+      }
+    }
+
+    function renderOrdre() {
+      const wantStatus = ordreFilter === 'avvist' ? 'Ordre avvist' : 'Ordre';
+      let list = ordreData.filter(o => o.status === wantStatus);
+
+      const q = (document.getElementById('ordreSearchBox').value || '').toLowerCase();
+      if (q) {
+        list = list.filter(o =>
+          (o.adresse || '').toLowerCase().includes(q) ||
+          (o.oppdragsnr || '').toLowerCase().includes(q) ||
+          (o.megler || '').toLowerCase().includes(q) ||
+          (o.selger || '').toLowerCase().includes(q) ||
+          (o.oppdragstype || '').toLowerCase().includes(q)
+        );
+      }
+      list = list.slice().sort((a, b) => dateCmp(a.datoMottatt, b.datoMottatt, true));
+
+      document.getElementById('ordreCountNye').textContent = ordreData.filter(o => o.status === 'Ordre').length;
+      document.getElementById('ordreCountAvvist').textContent = ordreData.filter(o => o.status === 'Ordre avvist').length;
+
+      const el = document.getElementById('ordreList');
+      if (list.length === 0) {
+        el.innerHTML = `<div class="empty">${ordreFilter === 'avvist' ? 'Ingen avviste ordre.' : 'Ingen nye ordre å godkjenne.'}</div>`;
+        return;
+      }
+
+      el.innerHTML = list.map(o => {
+        const addr = cleanAddress(o.adresse);
+        const addrHtml = addr.url
+          ? `<a href="${escapeHtml(addr.url)}" target="_blank" rel="noopener">${escapeHtml(addr.text)}</a>`
+          : escapeHtml(addr.text);
+        const actions = ordreFilter === 'avvist'
+          ? `<button class="btn btn-outline" onclick="restoreOrdre(${o.rowNum})">Ta inn igjen</button>`
+          : `<button class="btn btn-outline" onclick="rejectOrdre(${o.rowNum})">Avvis</button>
+             <button class="btn btn-primary" onclick="approveOrdre(${o.rowNum})">Godkjenn</button>`;
+        return `
+        <div class="ordre-card" data-row="${o.rowNum}" onclick="openModal(${o.rowNum})">
+          <div class="card-main">
+            <div class="card-address">${addrHtml}</div>
+            <div class="card-meta">
+              <span class="card-tag tag-type">${escapeHtml(o.oppdragstype || '-')}</span>
+              ${ordreFilter === 'avvist' ? '<span class="card-tag tag-avvist">Avvist</span>' : ''}
+              ${o.oppdragsnr ? `<span style="font-size:12px;color:#999">${escapeHtml(o.oppdragsnr)}</span>` : ''}
+            </div>
+            <div class="card-dates">Mottatt: ${escapeHtml(o.datoMottatt || '-')} · ${escapeHtml(o.selger || o.megler || '-')}${o.selgerTlf ? ' · ' + escapeHtml(o.selgerTlf) : ''}</div>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">${actions}</div>
+        </div>`;
+      }).join('');
+    }
+
+    async function ordreStatusChange(rowNum, newStatus, okMsg) {
+      try {
+        const res = await fetch(`/api/oppdrag/${rowNum}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Ukjent feil');
+        showToast(okMsg + (data.demoMode ? ' (demo)' : ''), 'success');
+        loadOrdre();
+      } catch (e) {
+        showToast('Kunne ikke oppdatere: ' + e.message, 'error');
+      }
+    }
+
+    function approveOrdre(rowNum) { ordreStatusChange(rowNum, 'Mottatt', 'Ordre godkjent — ligger nå i Oppdrag'); }
+    function rejectOrdre(rowNum) { ordreStatusChange(rowNum, 'Ordre avvist', 'Ordre avvist'); }
+    function restoreOrdre(rowNum) { ordreStatusChange(rowNum, 'Ordre', 'Tatt inn igjen som ny ordre'); }
 
     // ── Rendering ──
     function cleanAddress(addr) {
@@ -1057,6 +1266,16 @@
 
         html += `
         <div class="oppdrag-card" data-row="${o.rowNum}">
+          <div class="card-checks">
+            <label class="card-check check-fakturer" title="Klar til fakturering">
+              <input type="checkbox" ${o.kanFaktureres ? 'checked' : ''} onchange="toggleCardField(${o.rowNum}, 'kanFaktureres', this)">
+              Fakturer
+            </label>
+            <label class="card-check check-ivit" title="Hent fra IVIT ved neste kjøring">
+              <input type="checkbox" ${o.scanIvit ? 'checked' : ''} onchange="toggleCardField(${o.rowNum}, 'scanIvit', this)">
+              IVIT-skann
+            </label>
+          </div>
           <div class="card-main">
             <div class="card-address">${addrHtml}</div>
             <div class="card-meta">
@@ -1098,8 +1317,9 @@
     document.getElementById('cardList').addEventListener('click', e => {
       const card = e.target.closest('.oppdrag-card');
       if (!card) return;
-      // Don't intercept clicks on the address link
+      // Don't intercept clicks on the address link or the inline checkboxes
       if (e.target.closest('.card-address a')) return;
+      if (e.target.closest('.card-checks')) return;
       const rowNum = parseInt(card.dataset.row, 10);
       if (rowNum) openModal(rowNum);
     });
@@ -1462,11 +1682,21 @@
         document.getElementById('demoBanner').style.display = 'none';
         loadDashboard();
         stopAdminAutoRefresh();
+      } else if (v === 'ordre') {
+        oppdragView.style.display = 'none';
+        adminView.classList.remove('on');
+        document.getElementById('ordreView').classList.add('on');
+        document.getElementById('demoBanner').style.display = 'none';
+        loadOrdre();
+        stopAdminAutoRefresh();
       }
 
-      // When leaving dashboard, hide it
+      // When leaving dashboard/ordre, hide them
       if (v !== 'dashboard') {
         document.getElementById('dashboardView').classList.remove('on');
+      }
+      if (v !== 'ordre') {
+        document.getElementById('ordreView').classList.remove('on');
       }
     }
 
@@ -2231,7 +2461,9 @@
         setInterval(loadRegnskap, 60000);
       } else {
         loadData();
+        loadOrdre(); // populates the "Ordre" nav badge even before the tab is opened
         setInterval(loadData, 60000);
+        setInterval(loadOrdre, 60000);
       }
     })();
   </script>
